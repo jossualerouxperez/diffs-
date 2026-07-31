@@ -30,7 +30,7 @@
     touch-action:manipulation;user-select:none;}
   .frame .placeholder{color:#666;font-size:12px;padding:0 20px;text-align:center;}
   .frame img,.frame video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
-  .frame .ghost{z-index:2;opacity:0.38;pointer-events:none;}
+  .frame .ghost{z-index:2;opacity:0.50;pointer-events:none;}
   .frame video{z-index:1;}
   .tag{position:absolute;top:8px;left:10px;z-index:5;font-size:11px;font-weight:600;
     color:#fff;background:rgba(0,0,0,0.45);padding:2px 10px;border-radius:20px;
@@ -62,7 +62,7 @@
   /* Barre de progression mémorisation */
   .progress-bar{position:absolute;top:0;left:0;right:0;height:8px;z-index:7;background:rgba(255,255,255,0.2);border-radius:0;}
   .progress-bar .fill{height:100%;background:#fff;border-radius:0;transition:width linear;}
-  .progress-bar.black-phase .fill{background:var(--blue);}
+  .progress-bar.black-phase .fill{background:#fff;}
   .overlay.countdown{background:transparent;}
   .overlay.countdown span{display:none;}
   .overlay.black{background:#000;}
@@ -89,7 +89,10 @@
   .status.miss{background:#FBEBE9;color:var(--red);}
   .status .meta{margin-left:auto;font-weight:400;font-size:12px;color:var(--muted);}
 
-  .hint{font-size:12px;color:var(--muted);margin-top:10px;}
+  .mark-invite{position:absolute;bottom:12px;left:0;right:0;z-index:5;text-align:center;
+    color:#fff;font-size:14px;font-weight:600;text-shadow:0 1px 8px rgba(0,0,0,0.7);
+    pointer-events:none;animation:pulse 1.2s ease-in-out infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.45;}}
   .hide{display:none!important;}
   input[type=file]{display:none;}
 </style>
@@ -113,6 +116,7 @@
       <video id="video" playsinline muted></video>
       <img class="ghost hide" id="ghost" alt="">
       <div class="hint-overlay hide" id="hintGhost">Réaligne sur le fantôme puis reprends</div>
+      <div class="mark-invite hide" id="markInvite">👆 Touche l'endroit que tu as changé</div>
     </div>
 
     <!-- Déclencheur unique -->
@@ -260,6 +264,7 @@ document.getElementById("frCap").addEventListener("click",e=>{
     // Marquage zone
     pendingMark=eventToWork(e,document.getElementById("frCap"));
     drawMarker(document.getElementById("frCap"),pendingMark.cx,pendingMark.cy,+document.getElementById("rad").value,"");
+    document.getElementById("markInvite").classList.add("hide");
     document.getElementById("btnSave").disabled=false;
   }
 });
@@ -289,6 +294,7 @@ document.getElementById("fileB").onchange=e=>{
     document.getElementById("createSub").textContent="Touche l'endroit exact que tu as changé.";
     document.getElementById("btnImportB").classList.add("hide");
     document.getElementById("markStep").classList.remove("hide");
+    document.getElementById("markInvite").classList.remove("hide");
     creatorStep="mark"; btnShutter.disabled=true;
   });
 };
@@ -324,6 +330,7 @@ function resetCreator(){
   document.getElementById("createSub").textContent="Prends la photo de ta scène. Change ensuite un seul truc.";
   document.getElementById("btnImportA").classList.remove("hide");
   document.getElementById("btnImportB").classList.add("hide");
+  document.getElementById("markInvite").classList.add("hide");
   document.getElementById("markStep").classList.add("hide");
   document.getElementById("createStatus").classList.add("hide");
   btnShutter.disabled=true;
