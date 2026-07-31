@@ -118,7 +118,7 @@
       <video id="video" playsinline muted></video>
       <img class="ghost hide" id="ghost" alt="">
       <div class="hint-overlay hide" id="hintGhost">Réaligne sur le fantôme puis reprends</div>
-      <div class="mark-invite hide" id="markInvite">✏️ Dessine autour de ce que tu as changé</div>
+      <div class="mark-invite hide" id="markInvite">👆 Pose le doigt sur le changement, glisse pour agrandir</div>
       <canvas class="draw-canvas hide" id="drawCanvas"></canvas>
     </div>
 
@@ -265,10 +265,10 @@ function handleShutter(){
   }
 }
 
-const ZONE_R = 28;
+const ZONE_R_MIN = 16;
 
-// ---- Dessin de zone (lasso) ----
-let isDrawing=false, lassoPoints=[];
+// ---- Dessin de zone (cercle drag) ----
+let isDrawing=false, circleCenter=null, circleR=0;
 const drawCanvas=document.getElementById("drawCanvas");
 const dctx=drawCanvas.getContext("2d");
 
@@ -278,6 +278,7 @@ function initDrawCanvas(){
   drawCanvas.width=rect.width; drawCanvas.height=rect.height;
   drawCanvas.classList.remove("hide");
   dctx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
+  circleCenter=null; circleR=0;
 }
 
 function getPos(e){
@@ -286,61 +287,62 @@ function getPos(e){
   return{x:src.clientX-rect.left, y:src.clientY-rect.top};
 }
 
+function drawCircle(cx,cy,r,confirmed){
+  dctx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
+  dctx.beginPath();
+  dctx.arc(cx,cy,r,0,Math.PI*2);
+  dctx.strokeStyle=confirmed?"rgba(35,165,133,0.9)":"rgba(62,123,214,0.9)";
+  dctx.lineWidth=2.5;
+  dctx.stroke();
+  dctx.fillStyle=confirmed?"rgba(35,165,133,0.08)":"rgba(62,123,214,0.08)";
+  dctx.fill();
+}
+
 function startDraw(e){
   if(creatorStep!=="mark")return;
   e.preventDefault();
-  isDrawing=true; lassoPoints=[];
-  dctx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
-  const p=getPos(e); lassoPoints.push(p);
-  dctx.beginPath(); dctx.moveTo(p.x,p.y);
+  const p=getPos(e);
+  isDrawing=true;
+  circleCenter=p; circleR=ZONE_R_MIN;
+  drawCircle(p.x,p.y,circleR,false);
 }
 function moveDraw(e){
-  if(!isDrawing)return; e.preventDefault();
-  const p=getPos(e); lassoPoints.push(p);
-  dctx.lineTo(p.x,p.y);
-  dctx.strokeStyle="rgba(62,123,214,0.9)";
-  dctx.lineWidth=2.5; dctx.lineCap="round"; dctx.lineJoin="round";
-  dctx.stroke();
+  if(!isDrawing||!circleCenter)return;
+  e.preventDefault();
+  const p=getPos(e);
+  const dx=p.x-circleCenter.x, dy=p.y-circleCenter.y;
+  circleR=Math.max(ZONE_R_MIN, Math.sqrt(dx*dx+dy*dy));
+  drawCircle(circleCenter.x,circleCenter.y,circleR,false);
 }
 function endDraw(e){
-  if(!isDrawing)return; e.preventDefault();
+  if(!isDrawing||!circleCenter)return;
+  e.preventDefault();
   isDrawing=false;
-  if(lassoPoints.length<5){dctx.clearRect(0,0,drawCanvas.width,drawCanvas.height);return;}
-  // Fermer le lasso visuellement
-  dctx.closePath(); dctx.strokeStyle="rgba(62,123,214,0.9)"; dctx.stroke();
-  dctx.fillStyle="rgba(62,123,214,0.08)"; dctx.fill();
-  // Calculer le centre et le rayon englobant en coords de travail
+  // Convertir en coords de travail
   const rect=drawCanvas.getBoundingClientRect();
   const scaleX=WORK_W/rect.width, scaleY=workH/rect.height;
-  let minx=Infinity,maxx=-Infinity,miny=Infinity,maxy=-Infinity;
-  lassoPoints.forEach(p=>{
-    const wx=p.x*scaleX, wy=p.y*scaleY;
-    if(wx<minx)minx=wx; if(wx>maxx)maxx=wx;
-    if(wy<miny)miny=wy; if(wy>maxy)maxy=wy;
-  });
-  const cx=(minx+maxx)/2, cy=(miny+maxy)/2;
-  const r=Math.max(ZONE_R, Math.min((maxx-minx)/2,(maxy-miny)/2));
+  const cx=circleCenter.x*scaleX, cy=circleCenter.y*scaleY;
+  const r=circleR*((scaleX+scaleY)/2);
   const zone={cx,cy,r};
   document.getElementById("markInvite").classList.add("hide");
-  // Vérification
   setTimeout(()=>{
     const v=verifyZone(zone);
     const st=document.getElementById("createStatus"); st.classList.remove("hide");
-    dctx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
     clearMarkers(document.getElementById("frCap"));
     if(v.ok){
       puzzle=zone;
-      drawMarker(document.getElementById("frCap"),cx,cy,r,"correct");
+      drawCircle(circleCenter.x,circleCenter.y,circleR,true);
       st.className="status win";
       st.innerHTML="<span>✓ Changement confirmé — puzzle prêt</span><span class='meta'>passe à l'onglet Joueur</span>";
     }else{
       puzzle=null;
+      dctx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
       drawMarker(document.getElementById("frCap"),cx,cy,r,"miss-zone");
       st.className="status miss";
-      st.innerHTML="<span>Rien détecté ici — réessaie</span><span class='meta'>dessine autour de l'objet changé</span>";
+      st.innerHTML="<span>Rien détecté ici — réessaie</span><span class='meta'>repositionne ou agrandis le cercle</span>";
       setTimeout(()=>document.getElementById("markInvite").classList.remove("hide"),1500);
     }
-  },100);
+  },80);
 }
 
 drawCanvas.addEventListener("mousedown",startDraw);
@@ -392,7 +394,7 @@ document.getElementById("fileB").onchange=e=>{
 document.getElementById("btnRestart").onclick=resetCreator;
 function resetCreator(){
   stopCamera(); imgs.A=null; imgs.B=null; puzzle=null; creatorStep="idle";
-  isDrawing=false; lassoPoints=[];
+  isDrawing=false; circleCenter=null; circleR=0;
   dctx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
   drawCanvas.classList.add("hide");
   clearMarkers(document.getElementById("frCap"));
