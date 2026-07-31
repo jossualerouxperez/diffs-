@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Puzzle</title>
+<style>
+  :root {
+    --blue:#3E7BD6;--blue-tint:#EAF1FB;--ink:#1a1a1a;--muted:#8a8a8a;
+    --line:#E5E5E5;--grey-sq:#EAEAEA;--green:#23A585;--green-tint:#E3F4EE;--red:#c0392b;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{margin:0;background:#fff;color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    line-height:1.5;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:460px;margin:0 auto;padding:20px 18px 60px;}
+
+  .tabs{display:flex;gap:8px;margin-bottom:20px;}
+  .tabs button{flex:1;font:inherit;font-size:14px;font-weight:600;padding:9px;
+    border-radius:10px;cursor:pointer;border:0.5px solid var(--line);background:#fff;color:var(--muted);}
+  .tabs button.on{background:var(--blue);border-color:var(--blue);color:#fff;}
+
+  h2{font-size:15px;font-weight:600;margin:0 0 4px;}
+  .sub{color:var(--muted);font-size:13px;margin:0 0 14px;}
+
+  /* Cadre caméra/photo principal */
+  .frame{position:relative;width:100%;aspect-ratio:4/3;background:#111;
+    border-radius:14px;overflow:hidden;margin-bottom:10px;
+    display:flex;align-items:center;justify-content:center;
+    touch-action:manipulation;user-select:none;}
+  .frame .placeholder{color:#666;font-size:12px;padding:0 20px;text-align:center;}
+  .frame img,.frame video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+  .frame .ghost{z-index:2;opacity:0.38;pointer-events:none;}
+  .frame video{z-index:1;}
+  .tag{position:absolute;top:8px;left:10px;z-index:5;font-size:11px;font-weight:600;
+    color:#fff;background:rgba(0,0,0,0.45);padding:2px 10px;border-radius:20px;
+    backdrop-filter:blur(4px);}
+  .hint-overlay{position:absolute;bottom:70px;left:0;right:0;z-index:5;
+    text-align:center;color:rgba(255,255,255,0.9);font-size:13px;font-weight:500;
+    text-shadow:0 1px 6px rgba(0,0,0,0.6);pointer-events:none;}
+
+  /* Bouton déclencheur style appareil photo */
+  .shutter-row{display:flex;justify-content:center;align-items:center;gap:20px;
+    padding:8px 0 4px;}
+  .shutter{width:62px;height:62px;border-radius:50%;background:#fff;
+    border:4px solid #ccc;cursor:pointer;position:relative;flex-shrink:0;}
+  .shutter::after{content:"";position:absolute;inset:5px;border-radius:50%;background:#fff;
+    border:2px solid #ddd;}
+  .shutter.active{border-color:var(--blue);}
+  .shutter.active::after{background:var(--blue);}
+  .shutter:disabled{opacity:.4;cursor:default;}
+
+  /* Marqueurs de jeu */
+  .marker{position:absolute;z-index:4;border-radius:50%;
+    border:3px solid var(--blue);background:rgba(62,123,214,0.14);
+    transform:translate(-50%,-50%);pointer-events:none;}
+  .marker.correct{border-color:var(--green);background:rgba(35,165,133,0.16);}
+  .marker.miss{border-color:var(--red);background:rgba(192,57,43,0.14);width:30px;height:30px;}
+
+  /* Overlays compte à rebours */
+  .overlay{position:absolute;inset:0;z-index:6;display:flex;align-items:center;justify-content:center;}
+  .overlay.countdown{background:transparent;}
+  .overlay.countdown span{color:rgba(255,255,255,0.85);font-size:72px;font-weight:700;
+    text-shadow:0 2px 16px rgba(0,0,0,0.6);}
+  .overlay.black{background:#000;}
+  .overlay.black span{color:rgba(255,255,255,0.88);font-size:72px;font-weight:700;}
+
+  /* Slider */
+  .slider-row{display:flex;align-items:center;gap:12px;margin:12px 0;}
+  .slider-row label{font-size:13px;font-weight:600;min-width:70px;}
+  input[type=range]{flex:1;accent-color:var(--blue);}
+
+  /* Boutons généraux */
+  .btns{display:flex;gap:8px;margin-bottom:8px;}
+  button.act{font:inherit;font-size:13px;padding:9px 12px;border-radius:10px;
+    border:0.5px solid var(--line);background:#fff;color:var(--ink);cursor:pointer;flex:1;}
+  button.act:active{background:#f0f0f0;}
+  button.act.primary{background:var(--blue);border-color:var(--blue);color:#fff;}
+  button.act.primary:disabled{opacity:.4;cursor:default;}
+
+  /* Status */
+  .status{margin-top:14px;padding:12px 14px;border-radius:12px;font-size:14px;
+    font-weight:600;display:flex;align-items:center;gap:8px;
+    background:var(--blue-tint);color:var(--blue);}
+  .status.win{background:var(--green-tint);color:var(--green);}
+  .status.miss{background:#FBEBE9;color:var(--red);}
+  .status .meta{margin-left:auto;font-weight:400;font-size:12px;color:var(--muted);}
+
+  .hint{font-size:12px;color:var(--muted);margin-top:10px;}
+  .hide{display:none!important;}
+  input[type=file]{display:none;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="tabs">
+    <button id="tabCreate" class="on">Créateur</button>
+    <button id="tabPlay">Joueur</button>
+  </div>
+
+  <!-- ===== CRÉATEUR ===== -->
+  <section id="create">
+    <h2>Crée ton puzzle</h2>
+    <p class="sub" id="createSub">Prends la photo de ta scène. Change ensuite un seul truc.</p>
+
+    <div class="frame" id="frCap">
+      <span class="placeholder" id="capPh">Appuie sur le bouton pour ouvrir la caméra</span>
+      <span class="tag hide" id="capTag"></span>
+      <video id="video" playsinline muted></video>
+      <img class="ghost hide" id="ghost" alt="">
+      <div class="hint-overlay hide" id="hintGhost">Réaligne sur le fantôme puis reprends</div>
+    </div>
+
+    <!-- Déclencheur unique -->
+    <div class="shutter-row">
+      <button class="shutter" id="btnShutter" disabled title="Ouvrir la caméra"></button>
+    </div>
+
+    <!-- Secours import -->
+    <div class="btns" style="margin-top:6px">
+      <button class="act" id="btnImportA">Importer «&nbsp;avant&nbsp;»</button>
+      <button class="act hide" id="btnImportB">Importer «&nbsp;après&nbsp;»</button>
+    </div>
+    <input type="file" accept="image/*" id="fileA">
+    <input type="file" accept="image/*" id="fileB">
+
+    <!-- Marquage zone (apparaît après les 2 photos) -->
+    <div id="markStep" class="hide">
+      <div class="slider-row">
+        <label for="rad">Zone</label>
+        <input type="range" id="rad" min="16" max="60" value="28" step="1">
+      </div>
+      <div class="btns">
+        <button class="act primary" id="btnSave" disabled>Valider le puzzle</button>
+        <button class="act" id="btnRestart">Recommencer</button>
+      </div>
+      <p class="hint">Touche l'image à l'endroit exact que tu as changé.</p>
+    </div>
+    <div class="status hide" id="createStatus"></div>
+  </section>
+
+  <!-- ===== JOUEUR ===== -->
+  <section id="play" class="hide">
+    <h2>Mémorise puis retrouve</h2>
+    <p class="sub" id="playSub">Observe bien l'original… il va disparaître.</p>
+
+    <div class="frame" id="frPlay">
+      <span class="placeholder" id="playPh">Crée d'abord un puzzle</span>
+      <span class="tag hide" id="playTag"></span>
+      <div class="overlay countdown hide" id="countdown"><span id="cdNum">6</span></div>
+      <div class="overlay black hide" id="blackout"><span id="blackNum"></span></div>
+    </div>
+
+    <div class="status" id="playStatus"><span>Mémorise…</span></div>
+    <div class="btns" style="margin-top:12px">
+      <button class="act" id="btnReveal">Montrer</button>
+      <button class="act" id="btnReplay">Rejouer</button>
+    </div>
+  </section>
+
+</div>
+<script>
+"use strict";
+const WORK_W=320; let workH=240, aspectSet=false;
+const imgs={A:null,B:null}; let puzzle=null, activeStream=null;
+let creatorStep="idle"; // idle | camA | waitB | camB | mark
+let pendingMark=null;
+
+/* ---- Utilitaires image ---- */
+function setAspect(w,h){
+  if(aspectSet)return; workH=Math.max(80,Math.round(WORK_W*h/w)); aspectSet=true;
+  document.querySelectorAll(".frame").forEach(f=>f.style.aspectRatio=WORK_W+"/"+workH);
+}
+function toWork(src,w,h){
+  setAspect(w,h);
+  const c=document.createElement("canvas"); c.width=WORK_W; c.height=workH;
+  c.getContext("2d").drawImage(src,0,0,WORK_W,workH); return c;
+}
+function putImage(frame,canvas){
+  frame.querySelectorAll("img:not(.ghost)").forEach(n=>n.remove());
+  const ph=frame.querySelector(".placeholder"); if(ph)ph.style.display="none";
+  const img=document.createElement("img"); img.src=canvas.toDataURL();
+  frame.insertBefore(img,frame.firstChild);
+}
+function loadFile(slot,file,done){
+  const url=URL.createObjectURL(file), im=new Image();
+  im.onload=()=>{imgs[slot]=toWork(im,im.naturalWidth,im.naturalHeight);URL.revokeObjectURL(url);done();};
+  im.src=url;
+}
+
+/* ---- Caméra ---- */
+const video=document.getElementById("video");
+const ghost=document.getElementById("ghost");
+const capTag=document.getElementById("capTag");
+const hintGhost=document.getElementById("hintGhost");
+const btnShutter=document.getElementById("btnShutter");
+const capPh=document.getElementById("capPh");
+
+async function openCamera(){
+  try{
+    stopCamera();
+    activeStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"},audio:false});
+    video.srcObject=activeStream; video.style.display="block"; await video.play();
+    capPh.style.display="none"; btnShutter.disabled=false;
+  }catch(e){ capPh.textContent="Caméra indisponible — utilise Importer."; capPh.style.display=""; }
+}
+function stopCamera(){
+  if(activeStream){activeStream.getTracks().forEach(t=>t.stop());activeStream=null;}
+  video.style.display="none";
+}
+
+/* ---- Flux créateur en 2 prises, interface unique ---- */
+function startCreator(){
+  creatorStep="camA";
+  capTag.textContent="Avant"; capTag.classList.remove("hide");
+  ghost.classList.add("hide"); hintGhost.classList.add("hide");
+  document.getElementById("createSub").textContent="Cadre ta scène puis prends la photo.";
+  openCamera();
+}
+
+function handleShutter(){
+  if(creatorStep==="camA"){
+    // --- Prise 1 ---
+    const c=toWork(video,video.videoWidth,video.videoHeight);
+    imgs.A=c; putImage(document.getElementById("frCap"),c);
+    // On garde la caméra ouverte, on superpose le fantôme
+    ghost.src=c.toDataURL(); ghost.classList.remove("hide");
+    hintGhost.classList.remove("hide");
+    capTag.textContent="Après — change 1 truc";
+    document.getElementById("createSub").textContent="Change un truc, réaligne sur le fantôme, puis reprends.";
+    document.getElementById("btnImportA").classList.add("hide");
+    document.getElementById("btnImportB").classList.remove("hide");
+    creatorStep="camB";
+  } else if(creatorStep==="camB"){
+    // --- Prise 2 ---
+    const c=toWork(video,video.videoWidth,video.videoHeight);
+    imgs.B=c; stopCamera();
+    ghost.classList.add("hide"); hintGhost.classList.add("hide");
+    putImage(document.getElementById("frCap"),c);
+    capTag.textContent="Après — marque le changement";
+    document.getElementById("createSub").textContent="Touche l'endroit exact que tu as changé.";
+    document.getElementById("btnImportB").classList.add("hide");
+    document.getElementById("markStep").classList.remove("hide");
+    creatorStep="mark";
+    btnShutter.disabled=true;
+  }
+}
+
+btnShutter.onclick=handleShutter;
+
+// Ouvrir la caméra au clic sur le cadre si pas encore démarré
+document.getElementById("frCap").addEventListener("click",e=>{
+  if(creatorStep==="idle") startCreator();
+  else if(creatorStep==="mark"&&imgs.B){
+    // Marquage zone
+    pendingMark=eventToWork(e,document.getElementById("frCap"));
+    drawMarker(document.getElementById("frCap"),pendingMark.cx,pendingMark.cy,+document.getElementById("rad").value,"");
+    document.getElementById("btnSave").disabled=false;
+  }
+});
+
+// Importer (secours)
+document.getElementById("btnImportA").onclick=()=>document.getElementById("fileA").click();
+document.getElementById("btnImportB").onclick=()=>document.getElementById("fileB").click();
+document.getElementById("fileA").onchange=e=>{
+  if(!e.target.files[0])return;
+  loadFile("A",e.target.files[0],()=>{
+    putImage(document.getElementById("frCap"),imgs.A);
+    stopCamera(); ghost.src=imgs.A.toDataURL(); ghost.classList.remove("hide");
+    hintGhost.classList.remove("hide");
+    capTag.textContent="Après — change 1 truc"; capTag.classList.remove("hide");
+    document.getElementById("createSub").textContent="Importe maintenant la photo après ton changement.";
+    document.getElementById("btnImportA").classList.add("hide");
+    document.getElementById("btnImportB").classList.remove("hide");
+    creatorStep="camB"; btnShutter.disabled=true;
+  });
+};
+document.getElementById("fileB").onchange=e=>{
+  if(!e.target.files[0])return;
+  loadFile("B",e.target.files[0],()=>{
+    putImage(document.getElementById("frCap"),imgs.B);
+    ghost.classList.add("hide"); hintGhost.classList.add("hide");
+    capTag.textContent="Après — marque le changement";
+    document.getElementById("createSub").textContent="Touche l'endroit exact que tu as changé.";
+    document.getElementById("btnImportB").classList.add("hide");
+    document.getElementById("markStep").classList.remove("hide");
+    creatorStep="mark"; btnShutter.disabled=true;
+  });
+};
+
+// Slider zone
+document.getElementById("rad").addEventListener("input",()=>{
+  if(pendingMark) drawMarker(document.getElementById("frCap"),pendingMark.cx,pendingMark.cy,+document.getElementById("rad").value,"");
+});
+
+// Valider puzzle
+document.getElementById("btnSave").onclick=()=>{
+  if(!pendingMark)return;
+  const zone={cx:pendingMark.cx,cy:pendingMark.cy,r:+document.getElementById("rad").value};
+  const st=document.getElementById("createStatus"); st.classList.remove("hide");
+  const v=verifyZone(zone);
+  if(v.ok){
+    puzzle=zone; st.className="status win";
+    st.innerHTML="<span>Changement confirmé — puzzle prêt ✓</span><span class='meta'>zone "+v.peak.toFixed(0)+" vs fond "+v.bgMean.toFixed(0)+"</span>";
+  }else{
+    puzzle=null; st.className="status miss";
+    st.innerHTML="<span>Changement trop discret ou zone mal placée</span><span class='meta'>déplace ou agrandis la zone</span>";
+  }
+};
+
+// Recommencer
+document.getElementById("btnRestart").onclick=resetCreator;
+function resetCreator(){
+  stopCamera(); imgs.A=null; imgs.B=null; puzzle=null; pendingMark=null; creatorStep="idle";
+  clearMarkers(document.getElementById("frCap"));
+  document.getElementById("frCap").querySelectorAll("img:not(.ghost)").forEach(n=>n.remove());
+  capPh.style.display=""; capPh.textContent="Appuie sur le bouton pour ouvrir la caméra";
+  capTag.classList.add("hide"); ghost.classList.add("hide"); hintGhost.classList.add("hide");
+  document.getElementById("createSub").textContent="Prends la photo de ta scène. Change ensuite un seul truc.";
+  document.getElementById("btnImportA").classList.remove("hide");
+  document.getElementById("btnImportB").classList.add("hide");
+  document.getElementById("markStep").classList.add("hide");
+  document.getElementById("createStatus").classList.add("hide");
+  btnShutter.disabled=true;
+  document.getElementById("btnSave").disabled=true;
+}
+
+/* ---- Vérificateur (pic de diff dans la zone vs moyenne du fond) ---- */
+function grayBlur(canvas){
+  const d=canvas.getContext("2d").getImageData(0,0,WORK_W,workH).data;
+  const N=WORK_W*workH, g=new Float32Array(N);
+  for(let i=0,p=0;p<N;i+=4,p++) g[p]=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];
+  const out=new Float32Array(N);
+  for(let y=0;y<workH;y++) for(let x=0;x<WORK_W;x++){
+    let s=0,n=0;
+    for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){
+      const nx=x+dx,ny=y+dy;
+      if(nx>=0&&nx<WORK_W&&ny>=0&&ny<workH){s+=g[ny*WORK_W+nx];n++;}
+    }
+    out[y*WORK_W+x]=s/n;
+  }
+  return out;
+}
+function bestAlign(ga,gb){
+  let best={ox:0,oy:0,m:Infinity};
+  for(let oy=-5;oy<=5;oy++) for(let ox=-5;ox<=5;ox++){
+    let s=0,n=0;
+    for(let y=0;y<workH;y++){const yb=y+oy;if(yb<0||yb>=workH)continue;
+      for(let x=0;x<WORK_W;x++){const xb=x+ox;if(xb<0||xb>=WORK_W)continue;
+        s+=Math.abs(ga[y*WORK_W+x]-gb[yb*WORK_W+xb]);n++;}}
+    const m=n?s/n:999; if(m<best.m)best={ox,oy,m};
+  }
+  return best;
+}
+function verifyZone(zone){
+  const ga=grayBlur(imgs.A), gb=grayBlur(imgs.B);
+  const {ox,oy}=bestAlign(ga,gb);
+  const r2=zone.r*zone.r;
+  let peak=0, bSum=0, bN=0;
+  for(let y=0;y<workH;y++){
+    const yb=y+oy; if(yb<0||yb>=workH)continue;
+    for(let x=0;x<WORK_W;x++){
+      const xb=x+ox; if(xb<0||xb>=WORK_W)continue;
+      const d=Math.abs(ga[y*WORK_W+x]-gb[yb*WORK_W+xb]);
+      if((x-zone.cx)*(x-zone.cx)+(y-zone.cy)*(y-zone.cy)<=r2){ if(d>peak)peak=d; }
+      else{ bSum+=d; bN++; }
+    }
+  }
+  const bgMean=bN?bSum/bN:0;
+  const FLOOR=18, RATIO=2.5;
+  return{ok:peak>FLOOR&&peak>bgMean*RATIO, peak, bgMean};
+}
+
+/* ---- Joueur (mode mémoire) ---- */
+const MEMO_S=6, BLACK_S=3;
+const TAP_DELAY=1000, PENALTY_MS=3000;
+let startTime=0,timerRAF=0,solved=false,phase="idle";
+let cdTimer=0,blackTimer=0,lastTap=0,totalPenalty=0;
+
+function cancelPlay(){cancelAnimationFrame(timerRAF);clearInterval(cdTimer);clearInterval(blackTimer);}
+function elapsed(){return(performance.now()-startTime+totalPenalty)/1000;}
+
+function setupPlay(){
+  cancelPlay(); clearMarkers(document.getElementById("frPlay"));
+  document.getElementById("countdown").classList.add("hide");
+  document.getElementById("blackout").classList.add("hide");
+  solved=false; phase="idle";
+  const ps=document.getElementById("playStatus");
+  if(!puzzle||!imgs.A||!imgs.B){
+    ps.className="status"; ps.innerHTML="<span>Crée d'abord un puzzle dans l'onglet Créateur</span>"; return;
+  }
+  putImage(document.getElementById("frPlay"),imgs.A);
+  document.getElementById("playTag").textContent="Original"; document.getElementById("playTag").classList.remove("hide");
+  document.getElementById("playSub").textContent="Observe bien l'original… il va disparaître.";
+  ps.className="status"; ps.innerHTML="<span>Mémorise…</span>";
+  startCountdown();
+}
+function startCountdown(){
+  const cd=document.getElementById("countdown"), num=document.getElementById("cdNum");
+  let r=MEMO_S; cd.classList.remove("hide"); num.textContent=r;
+  cdTimer=setInterval(()=>{r--;if(r>0){num.textContent=r;}else{clearInterval(cdTimer);cd.classList.add("hide");goBlack();}},1000);
+}
+function goBlack(){
+  const bl=document.getElementById("blackout"), bn=document.getElementById("blackNum");
+  let r=BLACK_S; bl.classList.remove("hide"); bn.textContent=r;
+  blackTimer=setInterval(()=>{r--;if(r>0){bn.textContent=r;}else{clearInterval(blackTimer);revealModified();}},1000);
+}
+function revealModified(){
+  const fr=document.getElementById("frPlay");
+  putImage(fr,imgs.B);
+  document.getElementById("playTag").textContent="Modifié";
+  document.getElementById("playSub").textContent="Touche l'endroit qui a changé, de mémoire.";
+  document.getElementById("blackout").classList.add("hide");
+  phase="guess"; solved=false; lastTap=0; totalPenalty=0;
+  startTime=performance.now();
+  const ps=document.getElementById("playStatus");
+  ps.className="status"; ps.innerHTML="<span>Où est le changement ?</span><span class='meta' id='timer'>0.0 s</span>";
+  runTimer();
+}
+function runTimer(){
+  cancelAnimationFrame(timerRAF);
+  const tick=()=>{if(solved)return;const el=document.getElementById("timer");if(el)el.textContent=elapsed().toFixed(1)+" s";timerRAF=requestAnimationFrame(tick);};
+  timerRAF=requestAnimationFrame(tick);
+}
+function handleGuess(e){
+  if(phase!=="guess"||solved)return;
+  const now=performance.now(); if(now-lastTap<TAP_DELAY)return; lastTap=now;
+  const fr=document.getElementById("frPlay");
+  const p=eventToWork(e,fr);
+  const dx=p.cx-puzzle.cx, dy=p.cy-puzzle.cy;
+  const ps=document.getElementById("playStatus");
+  if(Math.sqrt(dx*dx+dy*dy)<=puzzle.r){
+    solved=true; cancelAnimationFrame(timerRAF);
+    const t=elapsed(), pts=Math.max(20,Math.round(220-t*12));
+    drawMarker(fr,puzzle.cx,puzzle.cy,puzzle.r,"correct");
+    ps.className="status win"; ps.innerHTML="<span>Trouvé en "+t.toFixed(1)+" s</span><span class='meta'>+"+pts+" pts</span>";
+  }else{
+    totalPenalty+=PENALTY_MS;
+    drawMarker(fr,p.cx,p.cy,15,"miss");
+    ps.className="status miss"; ps.innerHTML="<span>Raté, réessaie</span><span class='meta'>—</span>";
+    setTimeout(()=>{if(solved)return;ps.className="status";ps.innerHTML="<span>Où est le changement ?</span><span class='meta' id='timer'>"+elapsed().toFixed(1)+" s</span>";},900);
+  }
+}
+document.getElementById("frPlay").addEventListener("click",handleGuess);
+document.getElementById("btnReveal").onclick=()=>{
+  if(!puzzle||!imgs.B)return; cancelPlay();
+  const fr=document.getElementById("frPlay");
+  document.getElementById("countdown").classList.add("hide");
+  document.getElementById("blackout").classList.add("hide");
+  putImage(fr,imgs.B); document.getElementById("playTag").textContent="Modifié";
+  solved=true; phase="idle"; drawMarker(fr,puzzle.cx,puzzle.cy,puzzle.r,"correct");
+  document.getElementById("playStatus").className="status";
+  document.getElementById("playStatus").innerHTML="<span>Voilà la zone</span>";
+};
+document.getElementById("btnReplay").onclick=setupPlay;
+
+/* ---- Marqueurs & coords ---- */
+function eventToWork(e,frame){
+  const r=frame.getBoundingClientRect();
+  return{cx:(e.clientX-r.left)/r.width*WORK_W,cy:(e.clientY-r.top)/r.height*workH};
+}
+function drawMarker(frame,cx,cy,r,kind){
+  clearMarkers(frame,kind==="miss");
+  const rect=frame.getBoundingClientRect();
+  const sx=rect.width/WORK_W, sy=rect.height/workH;
+  const m=document.createElement("div");
+  m.className="marker"+(kind?" "+kind:"");
+  if(kind!=="miss"){m.style.width=(r*2*sx)+"px";m.style.height=(r*2*sy)+"px";}
+  m.style.left=(cx*sx)+"px"; m.style.top=(cy*sy)+"px";
+  frame.appendChild(m);
+}
+function clearMarkers(frame,keep){if(keep)return;frame.querySelectorAll(".marker").forEach(n=>n.remove());}
+
+/* ---- Onglets ---- */
+document.getElementById("tabCreate").onclick=()=>{
+  document.getElementById("tabCreate").classList.add("on");
+  document.getElementById("tabPlay").classList.remove("on");
+  document.getElementById("create").classList.remove("hide");
+  document.getElementById("play").classList.add("hide");
+  cancelPlay();
+};
+document.getElementById("tabPlay").onclick=()=>{
+  document.getElementById("tabPlay").classList.add("on");
+  document.getElementById("tabCreate").classList.remove("on");
+  document.getElementById("play").classList.remove("hide");
+  document.getElementById("create").classList.add("hide");
+  stopCamera(); setupPlay();
+};
+
+// Démarrer la caméra au chargement
+startCreator();
+</script>
+</body>
+</html>
