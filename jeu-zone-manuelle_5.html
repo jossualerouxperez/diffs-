@@ -291,22 +291,36 @@ function initDrawCanvas(){
 }
 
 function redrawZone(){
-  // Recomposite : masque → canvas visible avec opacité uniforme
   dctx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
   if(!maskCanvas)return;
-  // Dessiner le masque en blanc sur fond noir, puis l'afficher en bleu uniforme
-  const imgData=mctx.getImageData(0,0,maskCanvas.width,maskCanvas.height);
-  const out=dctx.createImageData(maskCanvas.width,maskCanvas.height);
+  const W=maskCanvas.width, H=maskCanvas.height;
+  const imgData=mctx.getImageData(0,0,W,H);
+  const out=dctx.createImageData(W,H);
+  // Passe 1 : remplissage uniforme
   for(let i=0;i<imgData.data.length;i+=4){
-    const painted=imgData.data[i]>128; // blanc = peint
+    const painted=imgData.data[i]>128;
     out.data[i]  =painted?62:0;
     out.data[i+1]=painted?123:0;
     out.data[i+2]=painted?214:0;
-    out.data[i+3]=painted?80:0;   // opacité uniforme
+    out.data[i+3]=painted?140:0;  // opacité plus forte
+  }
+  // Passe 2 : contour (pixel peint avec voisin non peint)
+  for(let y=1;y<H-1;y++){
+    for(let x=1;x<W-1;x++){
+      const p=(y*W+x)*4;
+      if(imgData.data[p]>128){
+        const border=
+          imgData.data[((y-1)*W+x)*4]<=128||
+          imgData.data[((y+1)*W+x)*4]<=128||
+          imgData.data[(y*W+x-1)*4]<=128||
+          imgData.data[(y*W+x+1)*4]<=128;
+        if(border){
+          out.data[p]=62; out.data[p+1]=123; out.data[p+2]=214; out.data[p+3]=230;
+        }
+      }
+    }
   }
   dctx.putImageData(out,0,0);
-  // Contour bleu par-dessus
-  dctx.globalCompositeOperation="source-over";
 }
 
 function getPos(e){
