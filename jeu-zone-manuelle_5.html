@@ -5,64 +5,113 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Puzzle</title>
 <style>
-  :root{--blue:#3E7BD6;--blue-tint:#EAF1FB;--ink:#1a1a1a;--muted:#8a8a8a;--line:#E5E5E5;--green:#23A585;--green-tint:#E3F4EE;--red:#c0392b;}
+  :root {
+    --blue:#3E7BD6;--blue-tint:#EAF1FB;--ink:#1a1a1a;--muted:#8a8a8a;
+    --line:#E5E5E5;--grey-sq:#EAEAEA;--green:#23A585;--green-tint:#E3F4EE;--red:#c0392b;
+  }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-  body{margin:0;background:#fff;color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;line-height:1.5;-webkit-font-smoothing:antialiased;}
+  body{margin:0;background:#fff;color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    line-height:1.5;-webkit-font-smoothing:antialiased;}
   .wrap{max-width:460px;margin:0 auto;padding:20px 18px 60px;}
+
   .tabs{display:flex;gap:8px;margin-bottom:20px;}
-  .tabs button{flex:1;font:inherit;font-size:14px;font-weight:600;padding:9px;border-radius:10px;cursor:pointer;border:0.5px solid var(--line);background:#fff;color:var(--muted);}
+  .tabs button{flex:1;font:inherit;font-size:14px;font-weight:600;padding:9px;
+    border-radius:10px;cursor:pointer;border:0.5px solid var(--line);background:#fff;color:var(--muted);}
   .tabs button.on{background:var(--blue);border-color:var(--blue);color:#fff;}
+
   h2{font-size:15px;font-weight:600;margin:0 0 4px;}
   .sub{color:var(--muted);font-size:13px;margin:0 0 14px;}
-  .frame{position:relative;width:100%;aspect-ratio:4/3;background:#111;border-radius:14px;overflow:hidden;margin-bottom:10px;display:flex;align-items:center;justify-content:center;touch-action:manipulation;user-select:none;}
+
+  /* Cadre caméra/photo principal */
+  .frame{position:relative;width:100%;aspect-ratio:4/3;background:#111;
+    border-radius:14px;overflow:hidden;margin-bottom:10px;
+    display:flex;align-items:center;justify-content:center;
+    touch-action:manipulation;user-select:none;}
   .frame .placeholder{color:#666;font-size:12px;padding:0 20px;text-align:center;}
   .frame img,.frame video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
   .frame .ghost{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:2;opacity:0.38;pointer-events:none;}
   .frame video{z-index:1;}
-  .tag{position:absolute;top:8px;left:10px;z-index:5;font-size:11px;font-weight:600;color:#fff;background:rgba(0,0,0,0.45);padding:2px 10px;border-radius:20px;backdrop-filter:blur(4px);}
-  .hint-overlay{position:absolute;bottom:70px;left:0;right:0;z-index:5;text-align:center;color:rgba(255,255,255,0.9);font-size:13px;font-weight:500;text-shadow:0 1px 6px rgba(0,0,0,0.6);pointer-events:none;}
-  .shutter-row{display:flex;justify-content:center;align-items:center;gap:20px;padding:8px 0 4px;}
-  .shutter{width:62px;height:62px;border-radius:50%;background:#fff;border:4px solid #ccc;cursor:pointer;position:relative;flex-shrink:0;}
-  .shutter::after{content:"";position:absolute;inset:5px;border-radius:50%;background:#fff;border:2px solid #ddd;}
+  .tag{position:absolute;top:8px;left:10px;z-index:5;font-size:11px;font-weight:600;
+    color:#fff;background:rgba(0,0,0,0.45);padding:2px 10px;border-radius:20px;
+    backdrop-filter:blur(4px);}
+  .hint-overlay{position:absolute;bottom:70px;left:0;right:0;z-index:5;
+    text-align:center;color:rgba(255,255,255,0.9);font-size:13px;font-weight:500;
+    text-shadow:0 1px 6px rgba(0,0,0,0.6);pointer-events:none;}
+
+  /* Bouton déclencheur style appareil photo */
+  .shutter-row{display:flex;justify-content:center;align-items:center;gap:20px;
+    padding:8px 0 4px;}
+  .shutter{width:62px;height:62px;border-radius:50%;background:#fff;
+    border:4px solid #ccc;cursor:pointer;position:relative;flex-shrink:0;}
+  .shutter::after{content:"";position:absolute;inset:5px;border-radius:50%;background:#fff;
+    border:2px solid #ddd;}
+  .shutter.active{border-color:var(--blue);}
+  .shutter.active::after{background:var(--blue);}
   .shutter:disabled{opacity:.4;cursor:default;}
-  .marker{position:absolute;z-index:4;border-radius:50%;border:3px solid var(--blue);background:rgba(62,123,214,0.14);transform:translate(-50%,-50%);pointer-events:none;}
+
+  /* Marqueurs de jeu */
+  .marker{position:absolute;z-index:4;border-radius:50%;
+    border:3px solid var(--blue);background:rgba(62,123,214,0.14);
+    transform:translate(-50%,-50%);pointer-events:none;}
   .marker.correct{border-color:var(--green);background:rgba(35,165,133,0.16);}
   .marker.miss{border-color:var(--red);background:rgba(192,57,43,0.14);width:30px;height:30px;}
   .marker.miss-zone{border-color:var(--red);background:rgba(192,57,43,0.10);border-style:dashed;}
+  .draw-canvas{position:absolute;inset:0;width:100%;height:100%;z-index:5;cursor:crosshair;touch-action:none;}
+
+  /* Overlays compte à rebours */
   .overlay{position:absolute;inset:0;z-index:6;display:flex;align-items:center;justify-content:center;}
+  /* Barre de progression mémorisation */
+  .progress-bar{position:absolute;top:0;left:0;right:0;height:8px;z-index:7;background:rgba(255,255,255,0.2);border-radius:0;}
+  .progress-bar .fill{height:100%;background:#fff;border-radius:0;transition:width linear;}
+  .progress-bar.black-phase .fill{background:#fff;}
   .overlay.countdown{background:transparent;}
   .overlay.countdown span{display:none;}
   .overlay.black{background:#000;}
   .overlay.black span{display:none;}
-  .progress-bar{position:absolute;top:0;left:0;right:0;height:8px;z-index:7;background:rgba(255,255,255,0.2);}
-  .progress-bar .fill{height:100%;background:#fff;transition:width linear;}
-  .progress-bar.black-phase .fill{background:#fff;}
-  .draw-canvas{position:absolute;inset:0;width:100%;height:100%;z-index:5;cursor:crosshair;touch-action:none;}
-  .mark-invite{position:absolute;bottom:12px;left:0;right:0;z-index:5;text-align:center;color:#fff;font-size:14px;font-weight:600;text-shadow:0 1px 8px rgba(0,0,0,0.7);pointer-events:none;animation:pulse 1.2s ease-in-out infinite;}
-  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.45;}}
+
+  /* Slider */
+  .slider-row{display:flex;align-items:center;gap:12px;margin:12px 0;}
+  .slider-row label{font-size:13px;font-weight:600;min-width:70px;}
+  input[type=range]{flex:1;accent-color:var(--blue);}
+
+  /* Boutons généraux */
   .btns{display:flex;gap:8px;margin-bottom:8px;}
-  button.act{font:inherit;font-size:13px;padding:9px 12px;border-radius:10px;border:0.5px solid var(--line);background:#fff;color:var(--ink);cursor:pointer;flex:1;}
+  button.act{font:inherit;font-size:13px;padding:9px 12px;border-radius:10px;
+    border:0.5px solid var(--line);background:#fff;color:var(--ink);cursor:pointer;flex:1;}
   button.act:active{background:#f0f0f0;}
   button.act.primary{background:var(--blue);border-color:var(--blue);color:#fff;}
-  .status{margin-top:14px;padding:12px 14px;border-radius:12px;font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px;background:var(--blue-tint);color:var(--blue);}
+  button.act.primary:disabled{opacity:.4;cursor:default;}
+
+  /* Status */
+  .status{margin-top:14px;padding:12px 14px;border-radius:12px;font-size:14px;
+    font-weight:600;display:flex;align-items:center;gap:8px;
+    background:var(--blue-tint);color:var(--blue);}
   .status.win{background:var(--green-tint);color:var(--green);}
   .status.miss{background:#FBEBE9;color:var(--red);}
   .status .meta{margin-left:auto;font-weight:400;font-size:12px;color:var(--muted);}
+
+  .mark-invite{position:absolute;bottom:12px;left:0;right:0;z-index:5;text-align:center;
+    color:#fff;font-size:14px;font-weight:600;text-shadow:0 1px 8px rgba(0,0,0,0.7);
+    pointer-events:none;animation:pulse 1.2s ease-in-out infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.45;}}
   .hide{display:none!important;}
   input[type=file]{display:none;}
 </style>
 </head>
 <body>
 <div class="wrap">
+
   <div class="tabs">
     <button id="tabCreate" class="on">Créateur</button>
     <button id="tabPlay">Joueur</button>
   </div>
 
-  <!-- CRÉATEUR -->
+  <!-- ===== CRÉATEUR ===== -->
   <section id="create">
     <h2>Crée ton puzzle</h2>
     <p class="sub" id="createSub">Prends la photo de ta scène. Change ensuite un seul truc.</p>
+
     <div class="frame" id="frCap">
       <span class="placeholder" id="capPh">Appuie sur le bouton pour ouvrir la caméra</span>
       <span class="tag hide" id="capTag"></span>
@@ -72,15 +121,21 @@
       <div class="mark-invite hide" id="markInvite">🖌️ Peins sur ce que tu as changé</div>
       <canvas class="draw-canvas hide" id="drawCanvas"></canvas>
     </div>
+
+    <!-- Déclencheur unique -->
     <div class="shutter-row">
-      <button class="shutter" id="btnShutter" disabled></button>
+      <button class="shutter" id="btnShutter" disabled title="Ouvrir la caméra"></button>
     </div>
+
+    <!-- Secours import -->
     <div class="btns" style="margin-top:6px">
-      <button class="act" id="btnImportA">Importer « avant »</button>
-      <button class="act hide" id="btnImportB">Importer « après »</button>
+      <button class="act" id="btnImportA">Importer «&nbsp;avant&nbsp;»</button>
+      <button class="act hide" id="btnImportB">Importer «&nbsp;après&nbsp;»</button>
     </div>
     <input type="file" accept="image/*" id="fileA">
     <input type="file" accept="image/*" id="fileB">
+
+    <!-- Marquage zone (apparaît après les 2 photos) -->
     <div id="markStep" class="hide">
       <div class="btns">
         <button class="act" id="btnRestart">Recommencer</button>
@@ -89,10 +144,11 @@
     <div class="status hide" id="createStatus"></div>
   </section>
 
-  <!-- JOUEUR -->
+  <!-- ===== JOUEUR ===== -->
   <section id="play" class="hide">
     <h2>Mémorise puis retrouve</h2>
     <p class="sub" id="playSub">Observe bien l'original… il va disparaître.</p>
+
     <div class="frame" id="frPlay">
       <span class="placeholder" id="playPh">Crée d'abord un puzzle</span>
       <span class="tag hide" id="playTag"></span>
@@ -100,21 +156,23 @@
       <div class="overlay black hide" id="blackout"><span id="blackNum"></span></div>
       <div class="progress-bar hide" id="progressBar"><div class="fill" id="progressFill" style="width:100%"></div></div>
     </div>
+
     <div class="status" id="playStatus"><span>Mémorise…</span></div>
     <div class="btns" style="margin-top:12px">
       <button class="act" id="btnReveal">Montrer</button>
       <button class="act" id="btnReplay">Rejouer</button>
     </div>
   </section>
-</div>
 
+</div>
 <script>
 "use strict";
 const WORK_W=320; let workH=240, aspectSet=false;
 const imgs={A:null,B:null}; let puzzle=null, activeStream=null;
-let creatorStep="idle", pendingMask=null;
+let creatorStep="idle";
+let pendingMark=null;
 
-/* ---- Image ---- */
+/* ---- Utilitaires image ---- */
 function setAspect(w,h){
   if(aspectSet)return; workH=Math.max(80,Math.round(WORK_W*h/w)); aspectSet=true;
   document.querySelectorAll(".frame").forEach(f=>f.style.aspectRatio=WORK_W+"/"+workH);
@@ -149,20 +207,26 @@ async function openCamera(){
     stopCamera();
     activeStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"},audio:false});
     video.srcObject=activeStream; video.style.display="block"; await video.play();
-    await new Promise(res=>{if(video.videoWidth>0){res();return;}video.addEventListener("loadedmetadata",res,{once:true});});
+    // Attendre que les dimensions vidéo soient disponibles
+    await new Promise(res=>{
+      if(video.videoWidth>0){res();return;}
+      video.addEventListener("loadedmetadata",res,{once:true});
+    });
     const vw=video.videoWidth, vh=video.videoHeight;
-    document.getElementById("frCap").style.aspectRatio=vw+"/"+vh;
+    const fr=document.getElementById("frCap");
+    fr.style.aspectRatio=vw+"/"+vh;
+    // Adapter le cadre joueur aussi pour cohérence
     document.getElementById("frPlay").style.aspectRatio=vw+"/"+vh;
     workH=Math.round(WORK_W*vh/vw); aspectSet=true;
     capPh.style.display="none"; btnShutter.disabled=false;
-  }catch(e){capPh.textContent="Caméra indisponible — utilise Importer.";capPh.style.display="";}
+  }catch(e){ capPh.textContent="Caméra indisponible — utilise Importer."; capPh.style.display=""; }
 }
 function stopCamera(){
   if(activeStream){activeStream.getTracks().forEach(t=>t.stop());activeStream=null;}
   video.style.display="none";
 }
 
-/* ---- Flux créateur ---- */
+/* ---- Flux créateur en 2 prises, interface unique ---- */
 function startCreator(){
   creatorStep="camA";
   capTag.textContent="Avant"; capTag.classList.remove("hide");
@@ -170,10 +234,13 @@ function startCreator(){
   document.getElementById("createSub").textContent="Cadre ta scène puis prends la photo.";
   openCamera();
 }
+
 function handleShutter(){
   if(creatorStep==="camA"){
+    // --- Prise 1 ---
     const c=toWork(video,video.videoWidth,video.videoHeight);
     imgs.A=c; putImage(document.getElementById("frCap"),c);
+    // On garde la caméra ouverte, on superpose le fantôme
     ghost.src=c.toDataURL(); ghost.classList.remove("hide");
     hintGhost.classList.remove("hide");
     capTag.textContent="Après — change 1 truc";
@@ -182,21 +249,172 @@ function handleShutter(){
     document.getElementById("btnImportB").classList.remove("hide");
     creatorStep="camB";
   } else if(creatorStep==="camB"){
+    // --- Prise 2 ---
     const c=toWork(video,video.videoWidth,video.videoHeight);
     imgs.B=c; stopCamera();
     ghost.classList.add("hide"); hintGhost.classList.add("hide");
     putImage(document.getElementById("frCap"),c);
-    capTag.textContent="Après — peins le changement";
-    document.getElementById("createSub").textContent="Peins sur l'objet que tu as changé.";
+    capTag.textContent="Après — marque le changement";
+    document.getElementById("createSub").textContent="Touche l'endroit exact que tu as changé.";
     document.getElementById("btnImportB").classList.add("hide");
     document.getElementById("markStep").classList.remove("hide");
     document.getElementById("markInvite").classList.remove("hide");
     initDrawCanvas();
-    creatorStep="mark"; btnShutter.disabled=true;
+    creatorStep="mark";
+    btnShutter.disabled=true;
   }
 }
+
+const BRUSH_R = 22;
+const GAME_TIMEOUT_S = 6;
+
+// ---- Dessin de zone (pinceau uniforme) ----
+let isDrawing=false, paintedPixels=null;
+const drawCanvas=document.getElementById("drawCanvas");
+const dctx=drawCanvas.getContext("2d");
+// Canvas de masque séparé pour garder une opacité uniforme
+let maskCanvas=null, mctx=null;
+
+function initDrawCanvas(){
+  const fr=document.getElementById("frCap");
+  const rect=fr.getBoundingClientRect();
+  drawCanvas.width=rect.width; drawCanvas.height=rect.height;
+  drawCanvas.classList.remove("hide");
+  // Canvas de masque (même taille, noir/blanc)
+  maskCanvas=document.createElement("canvas");
+  maskCanvas.width=rect.width; maskCanvas.height=rect.height;
+  mctx=maskCanvas.getContext("2d");
+  mctx.fillStyle="#000";
+  mctx.fillRect(0,0,maskCanvas.width,maskCanvas.height);
+  paintedPixels=null;
+  redrawZone();
+}
+
+function redrawZone(){
+  dctx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
+  if(!maskCanvas)return;
+  const W=maskCanvas.width, H=maskCanvas.height;
+  const imgData=mctx.getImageData(0,0,W,H);
+  const out=dctx.createImageData(W,H);
+  // Passe 1 : remplissage uniforme
+  for(let i=0;i<imgData.data.length;i+=4){
+    const painted=imgData.data[i]>128;
+    out.data[i]  =painted?62:0;
+    out.data[i+1]=painted?123:0;
+    out.data[i+2]=painted?214:0;
+    out.data[i+3]=painted?140:0;  // opacité plus forte
+  }
+  // Passe 2 : contour (pixel peint avec voisin non peint)
+  for(let y=1;y<H-1;y++){
+    for(let x=1;x<W-1;x++){
+      const p=(y*W+x)*4;
+      if(imgData.data[p]>128){
+        const border=
+          imgData.data[((y-1)*W+x)*4]<=128||
+          imgData.data[((y+1)*W+x)*4]<=128||
+          imgData.data[(y*W+x-1)*4]<=128||
+          imgData.data[(y*W+x+1)*4]<=128;
+        if(border){
+          out.data[p]=62; out.data[p+1]=123; out.data[p+2]=214; out.data[p+3]=230;
+        }
+      }
+    }
+  }
+  dctx.putImageData(out,0,0);
+}
+
+function getPos(e){
+  const rect=drawCanvas.getBoundingClientRect();
+  const src=e.touches?e.touches[0]:e;
+  return{x:src.clientX-rect.left, y:src.clientY-rect.top};
+}
+
+function paintAt(x,y){
+  mctx.beginPath();
+  mctx.arc(x,y,BRUSH_R,0,Math.PI*2);
+  mctx.fillStyle="#fff";
+  mctx.fill();
+  redrawZone();
+}
+
+function startDraw(e){
+  if(creatorStep!=="mark")return;
+  e.preventDefault();
+  isDrawing=true;
+  const p=getPos(e);
+  paintAt(p.x,p.y);
+}
+function moveDraw(e){
+  if(!isDrawing)return;
+  e.preventDefault();
+  const p=getPos(e);
+  paintAt(p.x,p.y);
+}
+function endDraw(e){
+  if(!isDrawing)return;
+  e.preventDefault();
+  isDrawing=false;
+  if(!maskCanvas)return;
+  const imgData=mctx.getImageData(0,0,maskCanvas.width,maskCanvas.height);
+  let minx=maskCanvas.width,maxx=0,miny=maskCanvas.height,maxy=0,found=false;
+  for(let y=0;y<maskCanvas.height;y++){
+    for(let x=0;x<maskCanvas.width;x++){
+      if(imgData.data[(y*maskCanvas.width+x)*4]>128){
+        if(x<minx)minx=x; if(x>maxx)maxx=x;
+        if(y<miny)miny=y; if(y>maxy)maxy=y;
+        found=true;
+      }
+    }
+  }
+  if(!found)return;
+  const rect=drawCanvas.getBoundingClientRect();
+  const scaleX=WORK_W/rect.width, scaleY=workH/rect.height;
+  const cx=((minx+maxx)/2)*scaleX, cy=((miny+maxy)/2)*scaleY;
+  const r=Math.max(BRUSH_R*scaleX,((maxx-minx)/2*scaleX+(maxy-miny)/2*scaleY)/2);
+  const zone={cx,cy,r};
+  document.getElementById("markInvite").classList.add("hide");
+  setTimeout(()=>{
+    const v=verifyZone(zone);
+    const st=document.getElementById("createStatus"); st.classList.remove("hide");
+    clearMarkers(document.getElementById("frCap"));
+    if(v.ok){
+      puzzle=zone;
+      // Repeindre en vert uniforme
+      const out=dctx.createImageData(maskCanvas.width,maskCanvas.height);
+      const id=mctx.getImageData(0,0,maskCanvas.width,maskCanvas.height);
+      for(let i=0;i<id.data.length;i+=4){
+        const p=id.data[i]>128;
+        out.data[i]=p?35:0; out.data[i+1]=p?165:0; out.data[i+2]=p?133:0; out.data[i+3]=p?80:0;
+      }
+      dctx.putImageData(out,0,0);
+      st.className="status win";
+      st.innerHTML="<span>✓ Changement confirmé — puzzle prêt</span><span class='meta'>passe à l'onglet Joueur</span>";
+    }else{
+      puzzle=null;
+      dctx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
+      mctx.fillStyle="#000"; mctx.fillRect(0,0,maskCanvas.width,maskCanvas.height);
+      st.className="status miss";
+      st.innerHTML="<span>Rien détecté ici — réessaie</span><span class='meta'>peins sur l'objet changé</span>";
+      setTimeout(()=>document.getElementById("markInvite").classList.remove("hide"),1500);
+    }
+  },80);
+}
+
+drawCanvas.addEventListener("mousedown",startDraw);
+drawCanvas.addEventListener("mousemove",moveDraw);
+drawCanvas.addEventListener("mouseup",endDraw);
+drawCanvas.addEventListener("touchstart",startDraw,{passive:false});
+drawCanvas.addEventListener("touchmove",moveDraw,{passive:false});
+drawCanvas.addEventListener("touchend",endDraw,{passive:false});
+
 btnShutter.onclick=handleShutter;
-document.getElementById("frCap").addEventListener("click",e=>{if(creatorStep==="idle")startCreator();});
+
+// Ouvrir la caméra au clic sur le cadre si pas encore démarré
+document.getElementById("frCap").addEventListener("click",e=>{
+  if(creatorStep==="idle") startCreator();
+});
+
+// Importer (secours)
 document.getElementById("btnImportA").onclick=()=>document.getElementById("fileA").click();
 document.getElementById("btnImportB").onclick=()=>document.getElementById("fileB").click();
 document.getElementById("fileA").onchange=e=>{
@@ -206,7 +424,7 @@ document.getElementById("fileA").onchange=e=>{
     stopCamera(); ghost.src=imgs.A.toDataURL(); ghost.classList.remove("hide");
     hintGhost.classList.remove("hide");
     capTag.textContent="Après — change 1 truc"; capTag.classList.remove("hide");
-    document.getElementById("createSub").textContent="Importe la photo après ton changement.";
+    document.getElementById("createSub").textContent="Importe maintenant la photo après ton changement.";
     document.getElementById("btnImportA").classList.add("hide");
     document.getElementById("btnImportB").classList.remove("hide");
     creatorStep="camB"; btnShutter.disabled=true;
@@ -217,8 +435,8 @@ document.getElementById("fileB").onchange=e=>{
   loadFile("B",e.target.files[0],()=>{
     putImage(document.getElementById("frCap"),imgs.B);
     ghost.classList.add("hide"); hintGhost.classList.add("hide");
-    capTag.textContent="Après — peins le changement"; capTag.classList.remove("hide");
-    document.getElementById("createSub").textContent="Peins sur l'objet que tu as changé.";
+    capTag.textContent="Après — marque le changement";
+    document.getElementById("createSub").textContent="Touche l'endroit exact que tu as changé.";
     document.getElementById("btnImportB").classList.add("hide");
     document.getElementById("markStep").classList.remove("hide");
     document.getElementById("markInvite").classList.remove("hide");
@@ -226,10 +444,14 @@ document.getElementById("fileB").onchange=e=>{
     setTimeout(initDrawCanvas,50);
   });
 };
+
+// Recommencer
 document.getElementById("btnRestart").onclick=resetCreator;
 function resetCreator(){
-  stopCamera(); imgs.A=null; imgs.B=null; puzzle=null; pendingMask=null; creatorStep="idle";
-  const dc=document.getElementById("drawCanvas"); dc.classList.add("hide");
+  stopCamera(); imgs.A=null; imgs.B=null; puzzle=null; creatorStep="idle";
+  isDrawing=false; paintedPixels=null;
+  dctx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
+  drawCanvas.classList.add("hide");
   clearMarkers(document.getElementById("frCap"));
   document.getElementById("frCap").querySelectorAll("img:not(.ghost)").forEach(n=>n.remove());
   capPh.style.display=""; capPh.textContent="Appuie sur le bouton pour ouvrir la caméra";
@@ -243,115 +465,10 @@ function resetCreator(){
   btnShutter.disabled=true;
 }
 
-/* ---- Pinceau de zone ---- */
-const BRUSH_R=22;
-let isDrawing=false;
-let maskCanvas=null, mctx=null;
-const drawCanvas=document.getElementById("drawCanvas");
-const dctx=drawCanvas.getContext("2d");
-
-function initDrawCanvas(){
-  const fr=document.getElementById("frCap").getBoundingClientRect();
-  drawCanvas.width=fr.width; drawCanvas.height=fr.height;
-  drawCanvas.classList.remove("hide");
-  maskCanvas=document.createElement("canvas");
-  maskCanvas.width=fr.width; maskCanvas.height=fr.height;
-  mctx=maskCanvas.getContext("2d");
-  mctx.fillStyle="#000"; mctx.fillRect(0,0,fr.width,fr.height);
-  redrawZone();
-}
-function redrawZone(){
-  dctx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
-  if(!maskCanvas)return;
-  const W=maskCanvas.width, H=maskCanvas.height;
-  const id=mctx.getImageData(0,0,W,H);
-  const out=dctx.createImageData(W,H);
-  for(let y=0;y<H;y++) for(let x=0;x<W;x++){
-    const i=(y*W+x)*4;
-    const painted=id.data[i]>128;
-    out.data[i]=painted?62:0; out.data[i+1]=painted?123:0; out.data[i+2]=painted?214:0;
-    out.data[i+3]=painted?140:0;
-    if(painted&&x>0&&x<W-1&&y>0&&y<H-1){
-      const border=id.data[i-4]<=128||id.data[i+4]<=128||id.data[i-W*4]<=128||id.data[i+W*4]<=128;
-      if(border) out.data[i+3]=230;
-    }
-  }
-  dctx.putImageData(out,0,0);
-}
-function getPos(e){
-  const rect=drawCanvas.getBoundingClientRect();
-  const src=e.touches?e.touches[0]:e;
-  return{x:src.clientX-rect.left,y:src.clientY-rect.top};
-}
-function paintAt(x,y){
-  mctx.beginPath(); mctx.arc(x,y,BRUSH_R,0,Math.PI*2);
-  mctx.fillStyle="#fff"; mctx.fill();
-  redrawZone();
-}
-function startDraw(e){if(creatorStep!=="mark")return;e.preventDefault();isDrawing=true;paintAt(...Object.values(getPos(e)));}
-function moveDraw(e){if(!isDrawing)return;e.preventDefault();const p=getPos(e);paintAt(p.x,p.y);}
-function endDraw(e){
-  if(!isDrawing)return; e.preventDefault(); isDrawing=false;
-  if(!maskCanvas)return;
-  const W=maskCanvas.width, H=maskCanvas.height;
-  const id=mctx.getImageData(0,0,W,H);
-  let minx=W,maxx=0,miny=H,maxy=0,found=false;
-  for(let y=0;y<H;y++) for(let x=0;x<W;x++){
-    if(id.data[(y*W+x)*4]>128){
-      if(x<minx)minx=x;if(x>maxx)maxx=x;if(y<miny)miny=y;if(y>maxy)maxy=y;found=true;
-    }
-  }
-  if(!found)return;
-  const scaleX=WORK_W/W, scaleY=workH/H;
-  const cx=((minx+maxx)/2)*scaleX, cy=((miny+maxy)/2)*scaleY;
-  const r=Math.max(BRUSH_R*scaleX,((maxx-minx)/2*scaleX+(maxy-miny)/2*scaleY)/2);
-  const zone={cx,cy,r};
-  document.getElementById("markInvite").classList.add("hide");
-  setTimeout(()=>{
-    const v=verifyZone(zone);
-    const st=document.getElementById("createStatus"); st.classList.remove("hide");
-    clearMarkers(document.getElementById("frCap"));
-    if(v.ok){
-      // Sauvegarder le masque pour la révélation joueur
-      pendingMask=maskCanvas.toDataURL();
-      puzzle={...zone, maskData:pendingMask};
-      // Repeindre en vert
-      const out2=dctx.createImageData(W,H);
-      for(let i=0;i<id.data.length;i+=4){
-        const p=id.data[i]>128;
-        out2.data[i]=p?35:0;out2.data[i+1]=p?165:0;out2.data[i+2]=p?133:0;out2.data[i+3]=p?140:0;
-        if(p){
-          const x=(i/4)%W,y=Math.floor((i/4)/W);
-          if(x>0&&x<W-1&&y>0&&y<H-1){
-            const border=id.data[i-4]<=128||id.data[i+4]<=128||id.data[i-W*4]<=128||id.data[i+W*4]<=128;
-            if(border) out2.data[i+3]=230;
-          }
-        }
-      }
-      dctx.putImageData(out2,0,0);
-      st.className="status win";
-      st.innerHTML="<span>✓ Changement confirmé — puzzle prêt</span><span class='meta'>passe à l'onglet Joueur</span>";
-    }else{
-      puzzle=null; pendingMask=null;
-      dctx.clearRect(0,0,W,H);
-      mctx.fillStyle="#000"; mctx.fillRect(0,0,W,H);
-      st.className="status miss";
-      st.innerHTML="<span>Rien détecté ici — réessaie</span><span class='meta'>peins sur l'objet changé</span>";
-      setTimeout(()=>document.getElementById("markInvite").classList.remove("hide"),1500);
-    }
-  },80);
-}
-drawCanvas.addEventListener("mousedown",startDraw);
-drawCanvas.addEventListener("mousemove",moveDraw);
-drawCanvas.addEventListener("mouseup",endDraw);
-drawCanvas.addEventListener("touchstart",startDraw,{passive:false});
-drawCanvas.addEventListener("touchmove",moveDraw,{passive:false});
-drawCanvas.addEventListener("touchend",endDraw,{passive:false});
-
-/* ---- Vérificateur ---- */
+/* ---- Vérificateur (pic de diff dans la zone vs moyenne du fond) ---- */
 function grayBlur(canvas){
   const d=canvas.getContext("2d").getImageData(0,0,WORK_W,workH).data;
-  const N=WORK_W*workH,g=new Float32Array(N);
+  const N=WORK_W*workH, g=new Float32Array(N);
   for(let i=0,p=0;p<N;i+=4,p++) g[p]=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];
   const out=new Float32Array(N);
   for(let y=0;y<workH;y++) for(let x=0;x<WORK_W;x++){
@@ -371,83 +488,45 @@ function bestAlign(ga,gb){
     for(let y=0;y<workH;y++){const yb=y+oy;if(yb<0||yb>=workH)continue;
       for(let x=0;x<WORK_W;x++){const xb=x+ox;if(xb<0||xb>=WORK_W)continue;
         s+=Math.abs(ga[y*WORK_W+x]-gb[yb*WORK_W+xb]);n++;}}
-    const m=n?s/n:999;if(m<best.m)best={ox,oy,m};
+    const m=n?s/n:999; if(m<best.m)best={ox,oy,m};
   }
   return best;
 }
 function verifyZone(zone){
-  const ga=grayBlur(imgs.A),gb=grayBlur(imgs.B);
+  const ga=grayBlur(imgs.A), gb=grayBlur(imgs.B);
   const {ox,oy}=bestAlign(ga,gb);
-  const r2=zone.r*zone.r; let peak=0,bSum=0,bN=0;
+  const r2=zone.r*zone.r;
+  let peak=0, bSum=0, bN=0;
   for(let y=0;y<workH;y++){
-    const yb=y+oy;if(yb<0||yb>=workH)continue;
+    const yb=y+oy; if(yb<0||yb>=workH)continue;
     for(let x=0;x<WORK_W;x++){
-      const xb=x+ox;if(xb<0||xb>=WORK_W)continue;
+      const xb=x+ox; if(xb<0||xb>=WORK_W)continue;
       const d=Math.abs(ga[y*WORK_W+x]-gb[yb*WORK_W+xb]);
-      if((x-zone.cx)*(x-zone.cx)+(y-zone.cy)*(y-zone.cy)<=r2){if(d>peak)peak=d;}
-      else{bSum+=d;bN++;}
+      if((x-zone.cx)*(x-zone.cx)+(y-zone.cy)*(y-zone.cy)<=r2){ if(d>peak)peak=d; }
+      else{ bSum+=d; bN++; }
     }
   }
   const bgMean=bN?bSum/bN:0;
-  return{ok:peak>18&&peak>bgMean*2.2,peak,bgMean};
-}
-
-/* ---- Afficher la zone du créateur côté joueur ---- */
-function revealZone(frame){
-  if(!puzzle)return;
-  if(puzzle.maskData){
-    const rect=frame.getBoundingClientRect();
-    const ov=document.createElement("canvas");
-    ov.className="zone-overlay";
-    ov.style.cssText="position:absolute;inset:0;width:100%;height:100%;z-index:4;pointer-events:none;";
-    ov.width=rect.width; ov.height=rect.height;
-    const oc=ov.getContext("2d");
-    const mask=new Image();
-    mask.onload=()=>{
-      const tmp=document.createElement("canvas");
-      tmp.width=rect.width; tmp.height=rect.height;
-      const tc=tmp.getContext("2d");
-      tc.drawImage(mask,0,0,rect.width,rect.height);
-      const id=tc.getImageData(0,0,rect.width,rect.height);
-      const out=oc.createImageData(rect.width,rect.height);
-      const W=rect.width;
-      for(let i=0;i<id.data.length;i+=4){
-        const painted=id.data[i]>128;
-        out.data[i]=painted?35:0;out.data[i+1]=painted?165:0;out.data[i+2]=painted?133:0;out.data[i+3]=painted?140:0;
-        if(painted){
-          const x=(i/4)%W,y=Math.floor((i/4)/W);
-          if(x>0&&x<W-1&&y>0&&y<rect.height-1){
-            const border=id.data[i-4]<=128||id.data[i+4]<=128||id.data[i-W*4]<=128||id.data[i+W*4]<=128;
-            if(border) out.data[i+3]=230;
-          }
-        }
-      }
-      oc.putImageData(out,0,0);
-    };
-    mask.src=puzzle.maskData;
-    frame.querySelectorAll(".zone-overlay").forEach(n=>n.remove());
-    frame.appendChild(ov);
-  } else {
-    drawMarker(frame,puzzle.cx,puzzle.cy,puzzle.r,"correct");
-  }
+  const FLOOR=18, RATIO=2.5;
+  return{ok:peak>FLOOR&&peak>bgMean*RATIO, peak, bgMean};
 }
 
 /* ---- Joueur (mode mémoire) ---- */
-const MEMO_S=3,BLACK_S=3,GAME_S=6;
-const TAP_DELAY=1000,PENALTY_MS=3000;
+const MEMO_S=3, BLACK_S=3;
+const TAP_DELAY=1000, PENALTY_MS=3000;
 let startTime=0,timerRAF=0,solved=false,phase="idle";
 let cdTimer=0,blackTimer=0,lastTap=0,totalPenalty=0;
 
 function cancelPlay(){cancelAnimationFrame(timerRAF);clearTimeout(cdTimer);clearTimeout(blackTimer);}
 function elapsed(){return(performance.now()-startTime+totalPenalty)/1000;}
 
-function showBar(durS,blue){
+function showBar(durationS,bluePhase){
   const bar=document.getElementById("progressBar"),fill=document.getElementById("progressFill");
   bar.classList.remove("hide");
-  bar.className="progress-bar"+(blue?" black-phase":"");
+  bar.className="progress-bar"+(bluePhase?" black-phase":"");
   fill.style.transition="none"; fill.style.width="100%";
   fill.getBoundingClientRect();
-  fill.style.transition="width "+durS+"s linear"; fill.style.width="0%";
+  fill.style.transition="width "+durationS+"s linear"; fill.style.width="0%";
 }
 function hideBar(){document.getElementById("progressBar").classList.add("hide");}
 
@@ -455,37 +534,41 @@ function setupPlay(){
   cancelPlay();
   const fr=document.getElementById("frPlay");
   clearMarkers(fr);
-  fr.querySelectorAll(".zone-overlay,img[style]").forEach(n=>n.remove());
+  fr.querySelectorAll("img:not(.ghost)[style]").forEach(n=>n.remove());
   document.getElementById("countdown").classList.add("hide");
   document.getElementById("blackout").classList.add("hide");
   hideBar(); solved=false; phase="idle";
   const ps=document.getElementById("playStatus");
   if(!puzzle||!imgs.A||!imgs.B){
-    ps.className="status";ps.innerHTML="<span>Crée d'abord un puzzle dans l'onglet Créateur</span>";return;
+    ps.className="status"; ps.innerHTML="<span>Crée d'abord un puzzle dans l'onglet Créateur</span>"; return;
   }
-  putImage(fr,imgs.A);
-  document.getElementById("playTag").textContent="Original";
-  document.getElementById("playTag").classList.remove("hide");
+  putImage(document.getElementById("frPlay"),imgs.A);
+  document.getElementById("playTag").textContent="Original"; document.getElementById("playTag").classList.remove("hide");
   document.getElementById("playSub").textContent="Observe bien l'original… il va disparaître.";
-  ps.className="status";ps.innerHTML="<span>Mémorise…</span>";
+  ps.className="status"; ps.innerHTML="<span>Mémorise…</span>";
+  startCountdown();
+}
+function startCountdown(){
+  document.getElementById("countdown").classList.remove("hide");
   showBar(MEMO_S,false);
-  cdTimer=setTimeout(()=>{hideBar();goBlack();},MEMO_S*1000);
+  cdTimer=setTimeout(()=>{document.getElementById("countdown").classList.add("hide");hideBar();goBlack();},MEMO_S*1000);
 }
 function goBlack(){
-  document.getElementById("countdown").classList.remove("hide");
-  showBar(BLACK_S,false);
-  blackTimer=setTimeout(()=>{document.getElementById("countdown").classList.add("hide");hideBar();revealModified();},BLACK_S*1000);
+  document.getElementById("blackout").classList.remove("hide");
+  showBar(BLACK_S,true);
+  blackTimer=setTimeout(()=>{hideBar();revealModified();},BLACK_S*1000);
 }
 function revealModified(){
   const fr=document.getElementById("frPlay");
   putImage(fr,imgs.B);
   document.getElementById("playTag").textContent="Modifié";
   document.getElementById("playSub").textContent="Touche l'endroit qui a changé, de mémoire.";
+  document.getElementById("blackout").classList.add("hide");
   phase="guess"; solved=false; lastTap=0; totalPenalty=0;
   startTime=performance.now();
   const ps=document.getElementById("playStatus");
-  ps.className="status";ps.innerHTML="<span>Où est le changement ?</span><span class='meta' id='timer'>0.0 s</span>";
-  showBar(GAME_S,false);
+  ps.className="status"; ps.innerHTML="<span>Où est le changement ?</span><span class='meta' id='timer'>0.0 s</span>";
+  showBar(GAME_TIMEOUT_S,false);
   runTimer();
 }
 function runTimer(){
@@ -493,59 +576,63 @@ function runTimer(){
   const tick=()=>{
     if(solved)return;
     const t=elapsed();
-    const el=document.getElementById("timer");if(el)el.textContent=t.toFixed(1)+" s";
-    const pct=Math.max(0,1-t/GAME_S);
+    const el=document.getElementById("timer");
+    if(el)el.textContent=t.toFixed(1)+" s";
+    if(t>=GAME_TIMEOUT_S){ timeOut(); return; }
+    // Barre de progression qui se vide en rouge
+    const pct=Math.max(0,1-t/GAME_TIMEOUT_S);
     const fill=document.getElementById("progressFill");
-    if(fill){fill.style.transition="none";fill.style.width=(pct*100)+"%";fill.style.background=pct>0.35?"#fff":"#c0392b";}
-    if(t>=GAME_S){timeOut();return;}
+    if(fill){ fill.style.transition="none"; fill.style.width=(pct*100)+"%";
+      fill.style.background=pct>0.4?"#fff":"#c0392b"; }
     timerRAF=requestAnimationFrame(tick);
   };
+  // Init barre
+  showBar(GAME_TIMEOUT_S,false);
   timerRAF=requestAnimationFrame(tick);
 }
+
 function timeOut(){
-  solved=true;cancelAnimationFrame(timerRAF);hideBar();
+  solved=true; cancelAnimationFrame(timerRAF); hideBar();
   const fr=document.getElementById("frPlay");
-  // Superposer l'original
-  const ov=document.createElement("img");
-  ov.src=imgs.A.toDataURL();
-  ov.style.cssText="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:3;opacity:0.5;pointer-events:none;";
-  fr.appendChild(ov);
-  // Révéler la zone peinte par le créateur
-  revealZone(fr);
+  // Superposer l'original en transparence
+  const overlay=document.createElement("img");
+  overlay.src=imgs.A.toDataURL();
+  overlay.style.cssText="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:3;opacity:0.5;pointer-events:none;";
+  fr.appendChild(overlay);
+  drawMarker(fr,puzzle.cx,puzzle.cy,puzzle.r,"correct");
   const ps=document.getElementById("playStatus");
-  ps.className="status miss";ps.innerHTML="<span>Temps écoulé !</span><span class='meta'>voilà où c'était</span>";
+  ps.className="status miss";
+  ps.innerHTML="<span>Temps écoulé !</span><span class='meta'>voilà où c'était</span>";
 }
 function handleGuess(e){
   if(phase!=="guess"||solved)return;
-  const now=performance.now();if(now-lastTap<TAP_DELAY)return;lastTap=now;
+  const now=performance.now(); if(now-lastTap<TAP_DELAY)return; lastTap=now;
   const fr=document.getElementById("frPlay");
   const p=eventToWork(e,fr);
-  const dx=p.cx-puzzle.cx,dy=p.cy-puzzle.cy;
+  const dx=p.cx-puzzle.cx, dy=p.cy-puzzle.cy;
   const ps=document.getElementById("playStatus");
   if(Math.sqrt(dx*dx+dy*dy)<=puzzle.r){
-    solved=true;cancelAnimationFrame(timerRAF);hideBar();
-    const t=elapsed(),pts=Math.max(20,Math.round(220-t*12));
+    solved=true; cancelAnimationFrame(timerRAF);
+    const t=elapsed(), pts=Math.max(20,Math.round(220-t*12));
     drawMarker(fr,puzzle.cx,puzzle.cy,puzzle.r,"correct");
-    ps.className="status win";ps.innerHTML="<span>Trouvé en "+t.toFixed(1)+" s</span><span class='meta'>+"+pts+" pts</span>";
+    ps.className="status win"; ps.innerHTML="<span>Trouvé en "+t.toFixed(1)+" s</span><span class='meta'>+"+pts+" pts</span>";
   }else{
     totalPenalty+=PENALTY_MS;
     drawMarker(fr,p.cx,p.cy,15,"miss");
-    ps.className="status miss";ps.innerHTML="<span>Raté, réessaie</span><span class='meta'>—</span>";
+    ps.className="status miss"; ps.innerHTML="<span>Raté, réessaie</span><span class='meta'>—</span>";
     setTimeout(()=>{if(solved)return;ps.className="status";ps.innerHTML="<span>Où est le changement ?</span><span class='meta' id='timer'>"+elapsed().toFixed(1)+" s</span>";},900);
   }
 }
 document.getElementById("frPlay").addEventListener("click",handleGuess);
 document.getElementById("btnReveal").onclick=()=>{
-  if(!puzzle||!imgs.B)return;cancelPlay();hideBar();
+  if(!puzzle||!imgs.B)return; cancelPlay();
   const fr=document.getElementById("frPlay");
   document.getElementById("countdown").classList.add("hide");
   document.getElementById("blackout").classList.add("hide");
-  putImage(fr,imgs.B);
-  document.getElementById("playTag").textContent="Modifié";
-  solved=true;phase="idle";
-  revealZone(fr);
-  const ps=document.getElementById("playStatus");
-  ps.className="status";ps.innerHTML="<span>Voilà la zone</span>";
+  putImage(fr,imgs.B); document.getElementById("playTag").textContent="Modifié";
+  solved=true; phase="idle"; drawMarker(fr,puzzle.cx,puzzle.cy,puzzle.r,"correct");
+  document.getElementById("playStatus").className="status";
+  document.getElementById("playStatus").innerHTML="<span>Voilà la zone</span>";
 };
 document.getElementById("btnReplay").onclick=setupPlay;
 
@@ -557,11 +644,11 @@ function eventToWork(e,frame){
 function drawMarker(frame,cx,cy,r,kind){
   clearMarkers(frame,kind==="miss");
   const rect=frame.getBoundingClientRect();
-  const sx=rect.width/WORK_W,sy=rect.height/workH;
+  const sx=rect.width/WORK_W, sy=rect.height/workH;
   const m=document.createElement("div");
   m.className="marker"+(kind?" "+kind:"");
   if(kind!=="miss"){m.style.width=(r*2*sx)+"px";m.style.height=(r*2*sy)+"px";}
-  m.style.left=(cx*sx)+"px";m.style.top=(cy*sy)+"px";
+  m.style.left=(cx*sx)+"px"; m.style.top=(cy*sy)+"px";
   frame.appendChild(m);
 }
 function clearMarkers(frame,keep){if(keep)return;frame.querySelectorAll(".marker").forEach(n=>n.remove());}
@@ -579,9 +666,10 @@ document.getElementById("tabPlay").onclick=()=>{
   document.getElementById("tabCreate").classList.remove("on");
   document.getElementById("play").classList.remove("hide");
   document.getElementById("create").classList.add("hide");
-  stopCamera();setupPlay();
+  stopCamera(); setupPlay();
 };
 
+// Démarrer la caméra au chargement
 startCreator();
 </script>
 </body>
