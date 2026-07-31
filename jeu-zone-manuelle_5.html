@@ -378,7 +378,8 @@ function endDraw(e){
     const st=document.getElementById("createStatus"); st.classList.remove("hide");
     clearMarkers(document.getElementById("frCap"));
     if(v.ok){
-      puzzle=zone;
+      // Sauvegarder la forme peinte pour l'afficher côté joueur
+      puzzle={...zone, maskData:maskCanvas.toDataURL()};
       // Repeindre en vert uniforme
       const out=dctx.createImageData(maskCanvas.width,maskCanvas.height);
       const id=mctx.getImageData(0,0,maskCanvas.width,maskCanvas.height);
@@ -571,6 +572,44 @@ function revealModified(){
   showBar(GAME_TIMEOUT_S,false);
   runTimer();
 }
+function showPuzzleZone(frame, green){
+  // Si on a la forme peinte, on l'affiche, sinon fallback cercle
+  if(puzzle.maskData){
+    const fr=frame.getBoundingClientRect();
+    const overlay=document.createElement("canvas");
+    overlay.style.cssText="position:absolute;inset:0;width:100%;height:100%;z-index:4;pointer-events:none;";
+    overlay.width=fr.width; overlay.height=fr.height;
+    const octx=overlay.getContext("2d");
+    const mask=new Image();
+    mask.onload=()=>{
+      // Dessiner le masque redimensionné avec la couleur voulue
+      const tmp=document.createElement("canvas");
+      tmp.width=fr.width; tmp.height=fr.height;
+      const tctx=tmp.getContext("2d");
+      tctx.drawImage(mask,0,0,fr.width,fr.height);
+      const id=tctx.getImageData(0,0,fr.width,fr.height);
+      const out=octx.createImageData(fr.width,fr.height);
+      const r=green?35:192, g=green?165:57, b=green?133:43;
+      for(let i=0;i<id.data.length;i+=4){
+        const painted=id.data[i]>128;
+        // Remplissage
+        out.data[i]=painted?r:0; out.data[i+1]=painted?g:0;
+        out.data[i+2]=painted?b:0; out.data[i+3]=painted?140:0;
+        // Contour
+        const x=(i/4)%fr.width, y=Math.floor((i/4)/fr.width);
+        if(painted&&x>0&&x<fr.width-1&&y>0&&y<fr.height-1){
+          const border=id.data[i-4]<=128||id.data[i+4]<=128||
+            id.data[i-fr.width*4]<=128||id.data[i+fr.width*4]<=128;
+          if(border){out.data[i+3]=230;}
+        }
+      }
+      octx.putImageData(out,0,0);
+    };
+    mask.src=puzzle.maskData;
+    frame.querySelectorAll("canvas.zone-overlay").forEach(n=>n.remove());
+    overlay.className="zone-overlay";
+    frame.appendChild(overlay);
+}
 function runTimer(){
   cancelAnimationFrame(timerRAF);
   const tick=()=>{
@@ -579,14 +618,12 @@ function runTimer(){
     const el=document.getElementById("timer");
     if(el)el.textContent=t.toFixed(1)+" s";
     if(t>=GAME_TIMEOUT_S){ timeOut(); return; }
-    // Barre de progression qui se vide en rouge
     const pct=Math.max(0,1-t/GAME_TIMEOUT_S);
     const fill=document.getElementById("progressFill");
     if(fill){ fill.style.transition="none"; fill.style.width=(pct*100)+"%";
       fill.style.background=pct>0.4?"#fff":"#c0392b"; }
     timerRAF=requestAnimationFrame(tick);
   };
-  // Init barre
   showBar(GAME_TIMEOUT_S,false);
   timerRAF=requestAnimationFrame(tick);
 }
@@ -594,12 +631,11 @@ function runTimer(){
 function timeOut(){
   solved=true; cancelAnimationFrame(timerRAF); hideBar();
   const fr=document.getElementById("frPlay");
-  // Superposer l'original en transparence
   const overlay=document.createElement("img");
   overlay.src=imgs.A.toDataURL();
   overlay.style.cssText="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:3;opacity:0.5;pointer-events:none;";
   fr.appendChild(overlay);
-  drawMarker(fr,puzzle.cx,puzzle.cy,puzzle.r,"correct");
+  showPuzzleZone(fr,true);
   const ps=document.getElementById("playStatus");
   ps.className="status miss";
   ps.innerHTML="<span>Temps écoulé !</span><span class='meta'>voilà où c'était</span>";
@@ -612,9 +648,9 @@ function handleGuess(e){
   const dx=p.cx-puzzle.cx, dy=p.cy-puzzle.cy;
   const ps=document.getElementById("playStatus");
   if(Math.sqrt(dx*dx+dy*dy)<=puzzle.r){
-    solved=true; cancelAnimationFrame(timerRAF);
+    solved=true; cancelAnimationFrame(timerRAF); hideBar();
     const t=elapsed(), pts=Math.max(20,Math.round(220-t*12));
-    drawMarker(fr,puzzle.cx,puzzle.cy,puzzle.r,"correct");
+    showPuzzleZone(fr,true);
     ps.className="status win"; ps.innerHTML="<span>Trouvé en "+t.toFixed(1)+" s</span><span class='meta'>+"+pts+" pts</span>";
   }else{
     totalPenalty+=PENALTY_MS;
@@ -625,12 +661,12 @@ function handleGuess(e){
 }
 document.getElementById("frPlay").addEventListener("click",handleGuess);
 document.getElementById("btnReveal").onclick=()=>{
-  if(!puzzle||!imgs.B)return; cancelPlay();
+  if(!puzzle||!imgs.B)return; cancelPlay(); hideBar();
   const fr=document.getElementById("frPlay");
   document.getElementById("countdown").classList.add("hide");
   document.getElementById("blackout").classList.add("hide");
   putImage(fr,imgs.B); document.getElementById("playTag").textContent="Modifié";
-  solved=true; phase="idle"; drawMarker(fr,puzzle.cx,puzzle.cy,puzzle.r,"correct");
+  solved=true; phase="idle"; showPuzzleZone(fr,true);
   document.getElementById("playStatus").className="status";
   document.getElementById("playStatus").innerHTML="<span>Voilà la zone</span>";
 };
@@ -671,6 +707,7 @@ document.getElementById("tabPlay").onclick=()=>{
 
 // Démarrer la caméra au chargement
 startCreator();
+}
 </script>
 </body>
 </html>
