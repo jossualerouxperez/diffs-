@@ -24,7 +24,7 @@
   .sub{color:var(--muted);font-size:13px;margin:0 0 14px;}
 
   /* Cadre caméra/photo principal */
-  .frame{position:relative;width:100%;aspect-ratio:4/3;background:#111;
+  .frame{position:relative;width:100%;aspect-ratio:3/4;background:#111;
     border-radius:14px;overflow:hidden;margin-bottom:10px;
     display:flex;align-items:center;justify-content:center;
     touch-action:manipulation;user-select:none;}
@@ -170,16 +170,13 @@
 </div>
 <script>
 "use strict";
-const WORK_W=320; let workH=240, aspectSet=false;
+const WORK_W=320; let workH=Math.round(WORK_W*4/3), aspectSet=false;
 const imgs={A:null,B:null}; let puzzle=null, activeStream=null;
 let creatorStep="idle"; // idle | camA | waitB | camB | mark
 let pendingMark=null;
 
 /* ---- Utilitaires image ---- */
-function setAspect(w,h){
-  if(aspectSet)return; workH=Math.max(80,Math.round(WORK_W*h/w)); aspectSet=true;
-  document.querySelectorAll(".frame").forEach(f=>f.style.aspectRatio=WORK_W+"/"+workH);
-}
+function setAspect(w,h){ if(aspectSet)return; aspectSet=true; }
 function toWork(src,w,h){
   setAspect(w,h);
   const c=document.createElement("canvas"); c.width=WORK_W; c.height=workH;
@@ -208,7 +205,7 @@ const capPh=document.getElementById("capPh");
 async function openCamera(){
   try{
     stopCamera();
-    activeStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"},audio:false});
+    activeStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment",aspectRatio:{ideal:3/4}},audio:false});
     video.srcObject=activeStream; video.style.display="block"; await video.play();
     capPh.style.display="none"; btnShutter.disabled=false;
   }catch(e){ capPh.textContent="Caméra indisponible — utilise Importer."; capPh.style.display=""; }
@@ -250,6 +247,7 @@ function handleShutter(){
     document.getElementById("createSub").textContent="Touche l'endroit exact que tu as changé.";
     document.getElementById("btnImportB").classList.add("hide");
     document.getElementById("markStep").classList.remove("hide");
+    document.getElementById("markInvite").classList.remove("hide");
     creatorStep="mark";
     btnShutter.disabled=true;
   }
