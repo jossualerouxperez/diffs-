@@ -57,7 +57,6 @@
   .marker.correct{border-color:var(--green);background:rgba(35,165,133,0.16);}
   .marker.miss{border-color:var(--red);background:rgba(192,57,43,0.14);width:30px;height:30px;}
   .marker.miss-zone{border-color:var(--red);background:rgba(192,57,43,0.10);border-style:dashed;}
-  .draw-canvas{position:absolute;inset:0;width:100%;height:100%;z-index:5;cursor:crosshair;touch-action:none;}
 
   /* Overlays compte à rebours */
   .overlay{position:absolute;inset:0;z-index:6;display:flex;align-items:center;justify-content:center;}
@@ -118,8 +117,7 @@
       <video id="video" playsinline muted></video>
       <img class="ghost hide" id="ghost" alt="">
       <div class="hint-overlay hide" id="hintGhost">Réaligne sur le fantôme puis reprends</div>
-      <div class="mark-invite hide" id="markInvite">✏️ Dessine autour de ce que tu as changé</div>
-      <canvas class="draw-canvas hide" id="drawCanvas"></canvas>
+      <div class="mark-invite hide" id="markInvite">👆 Touche l'endroit que tu as changé</div>
     </div>
 
     <!-- Déclencheur unique -->
@@ -259,102 +257,40 @@ function handleShutter(){
     document.getElementById("btnImportB").classList.add("hide");
     document.getElementById("markStep").classList.remove("hide");
     document.getElementById("markInvite").classList.remove("hide");
-    initDrawCanvas();
     creatorStep="mark";
     btnShutter.disabled=true;
   }
 }
 
-const ZONE_R = 28;
-
-// ---- Dessin de zone (lasso) ----
-let isDrawing=false, lassoPoints=[];
-const drawCanvas=document.getElementById("drawCanvas");
-const dctx=drawCanvas.getContext("2d");
-
-function initDrawCanvas(){
-  const fr=document.getElementById("frCap");
-  const rect=fr.getBoundingClientRect();
-  drawCanvas.width=rect.width; drawCanvas.height=rect.height;
-  drawCanvas.classList.remove("hide");
-  dctx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
-}
-
-function getPos(e){
-  const rect=drawCanvas.getBoundingClientRect();
-  const src=e.touches?e.touches[0]:e;
-  return{x:src.clientX-rect.left, y:src.clientY-rect.top};
-}
-
-function startDraw(e){
-  if(creatorStep!=="mark")return;
-  e.preventDefault();
-  isDrawing=true; lassoPoints=[];
-  dctx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
-  const p=getPos(e); lassoPoints.push(p);
-  dctx.beginPath(); dctx.moveTo(p.x,p.y);
-}
-function moveDraw(e){
-  if(!isDrawing)return; e.preventDefault();
-  const p=getPos(e); lassoPoints.push(p);
-  dctx.lineTo(p.x,p.y);
-  dctx.strokeStyle="rgba(62,123,214,0.9)";
-  dctx.lineWidth=2.5; dctx.lineCap="round"; dctx.lineJoin="round";
-  dctx.stroke();
-}
-function endDraw(e){
-  if(!isDrawing)return; e.preventDefault();
-  isDrawing=false;
-  if(lassoPoints.length<5){dctx.clearRect(0,0,drawCanvas.width,drawCanvas.height);return;}
-  // Fermer le lasso visuellement
-  dctx.closePath(); dctx.strokeStyle="rgba(62,123,214,0.9)"; dctx.stroke();
-  dctx.fillStyle="rgba(62,123,214,0.08)"; dctx.fill();
-  // Calculer le centre et le rayon englobant en coords de travail
-  const rect=drawCanvas.getBoundingClientRect();
-  const scaleX=WORK_W/rect.width, scaleY=workH/rect.height;
-  let minx=Infinity,maxx=-Infinity,miny=Infinity,maxy=-Infinity;
-  lassoPoints.forEach(p=>{
-    const wx=p.x*scaleX, wy=p.y*scaleY;
-    if(wx<minx)minx=wx; if(wx>maxx)maxx=wx;
-    if(wy<miny)miny=wy; if(wy>maxy)maxy=wy;
-  });
-  const cx=(minx+maxx)/2, cy=(miny+maxy)/2;
-  const r=Math.max(ZONE_R, Math.min((maxx-minx)/2,(maxy-miny)/2));
-  const zone={cx,cy,r};
-  document.getElementById("markInvite").classList.add("hide");
-  // Vérification
-  setTimeout(()=>{
-    const v=verifyZone(zone);
-    const st=document.getElementById("createStatus"); st.classList.remove("hide");
-    dctx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
-    clearMarkers(document.getElementById("frCap"));
-    if(v.ok){
-      puzzle=zone;
-      drawMarker(document.getElementById("frCap"),cx,cy,r,"correct");
-      st.className="status win";
-      st.innerHTML="<span>✓ Changement confirmé — puzzle prêt</span><span class='meta'>passe à l'onglet Joueur</span>";
-    }else{
-      puzzle=null;
-      drawMarker(document.getElementById("frCap"),cx,cy,r,"miss-zone");
-      st.className="status miss";
-      st.innerHTML="<span>Rien détecté ici — réessaie</span><span class='meta'>dessine autour de l'objet changé</span>";
-      setTimeout(()=>document.getElementById("markInvite").classList.remove("hide"),1500);
-    }
-  },100);
-}
-
-drawCanvas.addEventListener("mousedown",startDraw);
-drawCanvas.addEventListener("mousemove",moveDraw);
-drawCanvas.addEventListener("mouseup",endDraw);
-drawCanvas.addEventListener("touchstart",startDraw,{passive:false});
-drawCanvas.addEventListener("touchmove",moveDraw,{passive:false});
-drawCanvas.addEventListener("touchend",endDraw,{passive:false});
+const ZONE_R = 28; // taille fixe de la zone (rayon en px coords travail)
 
 btnShutter.onclick=handleShutter;
 
 // Ouvrir la caméra au clic sur le cadre si pas encore démarré
 document.getElementById("frCap").addEventListener("click",e=>{
   if(creatorStep==="idle") startCreator();
+  else if(creatorStep==="mark"&&imgs.B){
+    const fr=document.getElementById("frCap");
+    const p=eventToWork(e,fr);
+    const zone={cx:p.cx,cy:p.cy,r:ZONE_R};
+    document.getElementById("markInvite").classList.add("hide");
+    const v=verifyZone(zone);
+    const st=document.getElementById("createStatus"); st.classList.remove("hide");
+    clearMarkers(fr);
+    if(v.ok){
+      puzzle=zone;
+      drawMarker(fr,p.cx,p.cy,ZONE_R,"correct");
+      st.className="status win";
+      st.innerHTML="<span>✓ Changement confirmé — puzzle prêt</span><span class='meta'>passe à l'onglet Joueur</span>";
+    }else{
+      puzzle=null;
+      drawMarker(fr,p.cx,p.cy,ZONE_R,"miss-zone");
+      st.className="status miss";
+      st.innerHTML="<span>Rien détecté ici — réessaie</span><span class='meta'>touche pile l'objet changé</span>";
+      // Réafficher l'invite après 1.5s pour qu'il réessaie
+      setTimeout(()=>document.getElementById("markInvite").classList.remove("hide"),1500);
+    }
+  }
 });
 
 // Importer (secours)
@@ -384,7 +320,6 @@ document.getElementById("fileB").onchange=e=>{
     document.getElementById("markStep").classList.remove("hide");
     document.getElementById("markInvite").classList.remove("hide");
     creatorStep="mark"; btnShutter.disabled=true;
-    setTimeout(initDrawCanvas,50);
   });
 };
 
@@ -392,9 +327,6 @@ document.getElementById("fileB").onchange=e=>{
 document.getElementById("btnRestart").onclick=resetCreator;
 function resetCreator(){
   stopCamera(); imgs.A=null; imgs.B=null; puzzle=null; creatorStep="idle";
-  isDrawing=false; lassoPoints=[];
-  dctx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
-  drawCanvas.classList.add("hide");
   clearMarkers(document.getElementById("frCap"));
   document.getElementById("frCap").querySelectorAll("img:not(.ghost)").forEach(n=>n.remove());
   capPh.style.display=""; capPh.textContent="Appuie sur le bouton pour ouvrir la caméra";
@@ -455,7 +387,7 @@ function verifyZone(zone){
 }
 
 /* ---- Joueur (mode mémoire) ---- */
-const MEMO_S=3, BLACK_S=3;
+const MEMO_S=4, BLACK_S=3;
 const TAP_DELAY=1000, PENALTY_MS=3000;
 let startTime=0,timerRAF=0,solved=false,phase="idle";
 let cdTimer=0,blackTimer=0,lastTap=0,totalPenalty=0;
