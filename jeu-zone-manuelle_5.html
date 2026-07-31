@@ -265,20 +265,48 @@ function handleShutter(){
   }
 }
 
-const BRUSH_R = 22; // rayon du pinceau en px écran
+const BRUSH_R = 22;
+const GAME_TIMEOUT_S = 6;
 
-// ---- Dessin de zone (pinceau libre) ----
+// ---- Dessin de zone (pinceau uniforme) ----
 let isDrawing=false, paintedPixels=null;
 const drawCanvas=document.getElementById("drawCanvas");
 const dctx=drawCanvas.getContext("2d");
+// Canvas de masque séparé pour garder une opacité uniforme
+let maskCanvas=null, mctx=null;
 
 function initDrawCanvas(){
   const fr=document.getElementById("frCap");
   const rect=fr.getBoundingClientRect();
   drawCanvas.width=rect.width; drawCanvas.height=rect.height;
   drawCanvas.classList.remove("hide");
-  dctx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
+  // Canvas de masque (même taille, noir/blanc)
+  maskCanvas=document.createElement("canvas");
+  maskCanvas.width=rect.width; maskCanvas.height=rect.height;
+  mctx=maskCanvas.getContext("2d");
+  mctx.fillStyle="#000";
+  mctx.fillRect(0,0,maskCanvas.width,maskCanvas.height);
   paintedPixels=null;
+  redrawZone();
+}
+
+function redrawZone(){
+  // Recomposite : masque → canvas visible avec opacité uniforme
+  dctx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
+  if(!maskCanvas)return;
+  // Dessiner le masque en blanc sur fond noir, puis l'afficher en bleu uniforme
+  const imgData=mctx.getImageData(0,0,maskCanvas.width,maskCanvas.height);
+  const out=dctx.createImageData(maskCanvas.width,maskCanvas.height);
+  for(let i=0;i<imgData.data.length;i+=4){
+    const painted=imgData.data[i]>128; // blanc = peint
+    out.data[i]  =painted?62:0;
+    out.data[i+1]=painted?123:0;
+    out.data[i+2]=painted?214:0;
+    out.data[i+3]=painted?80:0;   // opacité uniforme
+  }
+  dctx.putImageData(out,0,0);
+  // Contour bleu par-dessus
+  dctx.globalCompositeOperation="source-over";
 }
 
 function getPos(e){
@@ -288,15 +316,11 @@ function getPos(e){
 }
 
 function paintAt(x,y){
-  dctx.beginPath();
-  dctx.arc(x,y,BRUSH_R,0,Math.PI*2);
-  dctx.fillStyle="rgba(62,123,214,0.35)";
-  dctx.fill();
-  dctx.beginPath();
-  dctx.arc(x,y,BRUSH_R,0,Math.PI*2);
-  dctx.strokeStyle="rgba(62,123,214,0.7)";
-  dctx.lineWidth=1.5;
-  dctx.stroke();
+  mctx.beginPath();
+  mctx.arc(x,y,BRUSH_R,0,Math.PI*2);
+  mctx.fillStyle="#fff";
+  mctx.fill();
+  redrawZone();
 }
 
 function startDraw(e){
@@ -316,23 +340,23 @@ function endDraw(e){
   if(!isDrawing)return;
   e.preventDefault();
   isDrawing=false;
-  // Calculer la bounding box de la zone peinte
-  const imgData=dctx.getImageData(0,0,drawCanvas.width,drawCanvas.height);
-  let minx=drawCanvas.width,maxx=0,miny=drawCanvas.height,maxy=0,found=false;
-  for(let y=0;y<drawCanvas.height;y++){
-    for(let x=0;x<drawCanvas.width;x++){
-      if(imgData.data[(y*drawCanvas.width+x)*4+3]>10){
+  if(!maskCanvas)return;
+  const imgData=mctx.getImageData(0,0,maskCanvas.width,maskCanvas.height);
+  let minx=maskCanvas.width,maxx=0,miny=maskCanvas.height,maxy=0,found=false;
+  for(let y=0;y<maskCanvas.height;y++){
+    for(let x=0;x<maskCanvas.width;x++){
+      if(imgData.data[(y*maskCanvas.width+x)*4]>128){
         if(x<minx)minx=x; if(x>maxx)maxx=x;
         if(y<miny)miny=y; if(y>maxy)maxy=y;
         found=true;
       }
     }
   }
-  if(!found){return;}
+  if(!found)return;
   const rect=drawCanvas.getBoundingClientRect();
   const scaleX=WORK_W/rect.width, scaleY=workH/rect.height;
   const cx=((minx+maxx)/2)*scaleX, cy=((miny+maxy)/2)*scaleY;
-  const r=Math.max(BRUSH_R*scaleX, ((maxx-minx)/2*scaleX + (maxy-miny)/2*scaleY)/2);
+  const r=Math.max(BRUSH_R*scaleX,((maxx-minx)/2*scaleX+(maxy-miny)/2*scaleY)/2);
   const zone={cx,cy,r};
   document.getElementById("markInvite").classList.add("hide");
   setTimeout(()=>{
@@ -341,18 +365,20 @@ function endDraw(e){
     clearMarkers(document.getElementById("frCap"));
     if(v.ok){
       puzzle=zone;
-      // Repeindre en vert
-      dctx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
-      dctx.fillStyle="rgba(35,165,133,0.25)";
-      dctx.fillRect(minx-2,miny-2,maxx-minx+4,maxy-miny+4);
-      dctx.strokeStyle="rgba(35,165,133,0.9)";
-      dctx.lineWidth=2;
-      dctx.strokeRect(minx-2,miny-2,maxx-minx+4,maxy-miny+4);
+      // Repeindre en vert uniforme
+      const out=dctx.createImageData(maskCanvas.width,maskCanvas.height);
+      const id=mctx.getImageData(0,0,maskCanvas.width,maskCanvas.height);
+      for(let i=0;i<id.data.length;i+=4){
+        const p=id.data[i]>128;
+        out.data[i]=p?35:0; out.data[i+1]=p?165:0; out.data[i+2]=p?133:0; out.data[i+3]=p?80:0;
+      }
+      dctx.putImageData(out,0,0);
       st.className="status win";
       st.innerHTML="<span>✓ Changement confirmé — puzzle prêt</span><span class='meta'>passe à l'onglet Joueur</span>";
     }else{
       puzzle=null;
       dctx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
+      mctx.fillStyle="#000"; mctx.fillRect(0,0,maskCanvas.width,maskCanvas.height);
       st.className="status miss";
       st.innerHTML="<span>Rien détecté ici — réessaie</span><span class='meta'>peins sur l'objet changé</span>";
       setTimeout(()=>document.getElementById("markInvite").classList.remove("hide"),1500);
@@ -528,10 +554,9 @@ function revealModified(){
   startTime=performance.now();
   const ps=document.getElementById("playStatus");
   ps.className="status"; ps.innerHTML="<span>Où est le changement ?</span><span class='meta' id='timer'>0.0 s</span>";
+  showBar(GAME_TIMEOUT_S,false);
   runTimer();
 }
-const GAME_TIMEOUT_S = 15; // timer max joueur en secondes
-
 function runTimer(){
   cancelAnimationFrame(timerRAF);
   const tick=()=>{
@@ -539,22 +564,27 @@ function runTimer(){
     const t=elapsed();
     const el=document.getElementById("timer");
     if(el)el.textContent=t.toFixed(1)+" s";
-    // Timer expiré → révéler la réponse par superposition
     if(t>=GAME_TIMEOUT_S){ timeOut(); return; }
+    // Barre de progression qui se vide en rouge
+    const pct=Math.max(0,1-t/GAME_TIMEOUT_S);
+    const fill=document.getElementById("progressFill");
+    if(fill){ fill.style.transition="none"; fill.style.width=(pct*100)+"%";
+      fill.style.background=pct>0.4?"#fff":"#c0392b"; }
     timerRAF=requestAnimationFrame(tick);
   };
+  // Init barre
+  showBar(GAME_TIMEOUT_S,false);
   timerRAF=requestAnimationFrame(tick);
 }
 
 function timeOut(){
-  solved=true;
+  solved=true; cancelAnimationFrame(timerRAF); hideBar();
   const fr=document.getElementById("frPlay");
-  // Superposer l'image originale en transparence par-dessus l'image modifiée
+  // Superposer l'original en transparence
   const overlay=document.createElement("img");
   overlay.src=imgs.A.toDataURL();
   overlay.style.cssText="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:3;opacity:0.5;pointer-events:none;";
   fr.appendChild(overlay);
-  // Afficher la zone
   drawMarker(fr,puzzle.cx,puzzle.cy,puzzle.r,"correct");
   const ps=document.getElementById("playStatus");
   ps.className="status miss";
