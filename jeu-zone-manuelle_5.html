@@ -118,7 +118,7 @@
       <video id="video" playsinline muted></video>
       <img class="ghost hide" id="ghost" alt="">
       <div class="hint-overlay hide" id="hintGhost">Réaligne sur le fantôme puis reprends</div>
-      <div class="mark-invite hide" id="markInvite">👆 Pose le doigt sur le changement, glisse pour agrandir</div>
+      <div class="mark-invite hide" id="markInvite">🖌️ Peins sur ce que tu as changé</div>
       <canvas class="draw-canvas hide" id="drawCanvas"></canvas>
     </div>
 
@@ -265,10 +265,10 @@ function handleShutter(){
   }
 }
 
-const ZONE_R_MIN = 16;
+const BRUSH_R = 22; // rayon du pinceau en px écran
 
-// ---- Dessin de zone (cercle drag) ----
-let isDrawing=false, circleCenter=null, circleR=0;
+// ---- Dessin de zone (pinceau libre) ----
+let isDrawing=false, paintedPixels=null;
 const drawCanvas=document.getElementById("drawCanvas");
 const dctx=drawCanvas.getContext("2d");
 
@@ -278,7 +278,7 @@ function initDrawCanvas(){
   drawCanvas.width=rect.width; drawCanvas.height=rect.height;
   drawCanvas.classList.remove("hide");
   dctx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
-  circleCenter=null; circleR=0;
+  paintedPixels=null;
 }
 
 function getPos(e){
@@ -287,42 +287,52 @@ function getPos(e){
   return{x:src.clientX-rect.left, y:src.clientY-rect.top};
 }
 
-function drawCircle(cx,cy,r,confirmed){
-  dctx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
+function paintAt(x,y){
   dctx.beginPath();
-  dctx.arc(cx,cy,r,0,Math.PI*2);
-  dctx.strokeStyle=confirmed?"rgba(35,165,133,0.9)":"rgba(62,123,214,0.9)";
-  dctx.lineWidth=2.5;
-  dctx.stroke();
-  dctx.fillStyle=confirmed?"rgba(35,165,133,0.08)":"rgba(62,123,214,0.08)";
+  dctx.arc(x,y,BRUSH_R,0,Math.PI*2);
+  dctx.fillStyle="rgba(62,123,214,0.35)";
   dctx.fill();
+  dctx.beginPath();
+  dctx.arc(x,y,BRUSH_R,0,Math.PI*2);
+  dctx.strokeStyle="rgba(62,123,214,0.7)";
+  dctx.lineWidth=1.5;
+  dctx.stroke();
 }
 
 function startDraw(e){
   if(creatorStep!=="mark")return;
   e.preventDefault();
-  const p=getPos(e);
   isDrawing=true;
-  circleCenter=p; circleR=ZONE_R_MIN;
-  drawCircle(p.x,p.y,circleR,false);
+  const p=getPos(e);
+  paintAt(p.x,p.y);
 }
 function moveDraw(e){
-  if(!isDrawing||!circleCenter)return;
+  if(!isDrawing)return;
   e.preventDefault();
   const p=getPos(e);
-  const dx=p.x-circleCenter.x, dy=p.y-circleCenter.y;
-  circleR=Math.max(ZONE_R_MIN, Math.sqrt(dx*dx+dy*dy));
-  drawCircle(circleCenter.x,circleCenter.y,circleR,false);
+  paintAt(p.x,p.y);
 }
 function endDraw(e){
-  if(!isDrawing||!circleCenter)return;
+  if(!isDrawing)return;
   e.preventDefault();
   isDrawing=false;
-  // Convertir en coords de travail
+  // Calculer la bounding box de la zone peinte
+  const imgData=dctx.getImageData(0,0,drawCanvas.width,drawCanvas.height);
+  let minx=drawCanvas.width,maxx=0,miny=drawCanvas.height,maxy=0,found=false;
+  for(let y=0;y<drawCanvas.height;y++){
+    for(let x=0;x<drawCanvas.width;x++){
+      if(imgData.data[(y*drawCanvas.width+x)*4+3]>10){
+        if(x<minx)minx=x; if(x>maxx)maxx=x;
+        if(y<miny)miny=y; if(y>maxy)maxy=y;
+        found=true;
+      }
+    }
+  }
+  if(!found){return;}
   const rect=drawCanvas.getBoundingClientRect();
   const scaleX=WORK_W/rect.width, scaleY=workH/rect.height;
-  const cx=circleCenter.x*scaleX, cy=circleCenter.y*scaleY;
-  const r=circleR*((scaleX+scaleY)/2);
+  const cx=((minx+maxx)/2)*scaleX, cy=((miny+maxy)/2)*scaleY;
+  const r=Math.max(BRUSH_R*scaleX, ((maxx-minx)/2*scaleX + (maxy-miny)/2*scaleY)/2);
   const zone={cx,cy,r};
   document.getElementById("markInvite").classList.add("hide");
   setTimeout(()=>{
@@ -331,15 +341,20 @@ function endDraw(e){
     clearMarkers(document.getElementById("frCap"));
     if(v.ok){
       puzzle=zone;
-      drawCircle(circleCenter.x,circleCenter.y,circleR,true);
+      // Repeindre en vert
+      dctx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
+      dctx.fillStyle="rgba(35,165,133,0.25)";
+      dctx.fillRect(minx-2,miny-2,maxx-minx+4,maxy-miny+4);
+      dctx.strokeStyle="rgba(35,165,133,0.9)";
+      dctx.lineWidth=2;
+      dctx.strokeRect(minx-2,miny-2,maxx-minx+4,maxy-miny+4);
       st.className="status win";
       st.innerHTML="<span>✓ Changement confirmé — puzzle prêt</span><span class='meta'>passe à l'onglet Joueur</span>";
     }else{
       puzzle=null;
       dctx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
-      drawMarker(document.getElementById("frCap"),cx,cy,r,"miss-zone");
       st.className="status miss";
-      st.innerHTML="<span>Rien détecté ici — réessaie</span><span class='meta'>repositionne ou agrandis le cercle</span>";
+      st.innerHTML="<span>Rien détecté ici — réessaie</span><span class='meta'>peins sur l'objet changé</span>";
       setTimeout(()=>document.getElementById("markInvite").classList.remove("hide"),1500);
     }
   },80);
@@ -394,7 +409,7 @@ document.getElementById("fileB").onchange=e=>{
 document.getElementById("btnRestart").onclick=resetCreator;
 function resetCreator(){
   stopCamera(); imgs.A=null; imgs.B=null; puzzle=null; creatorStep="idle";
-  isDrawing=false; circleCenter=null; circleR=0;
+  isDrawing=false; paintedPixels=null;
   dctx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
   drawCanvas.classList.add("hide");
   clearMarkers(document.getElementById("frCap"));
@@ -476,7 +491,10 @@ function showBar(durationS,bluePhase){
 function hideBar(){document.getElementById("progressBar").classList.add("hide");}
 
 function setupPlay(){
-  cancelPlay(); clearMarkers(document.getElementById("frPlay"));
+  cancelPlay();
+  const fr=document.getElementById("frPlay");
+  clearMarkers(fr);
+  fr.querySelectorAll("img:not(.ghost)[style]").forEach(n=>n.remove());
   document.getElementById("countdown").classList.add("hide");
   document.getElementById("blackout").classList.add("hide");
   hideBar(); solved=false; phase="idle";
@@ -512,10 +530,35 @@ function revealModified(){
   ps.className="status"; ps.innerHTML="<span>Où est le changement ?</span><span class='meta' id='timer'>0.0 s</span>";
   runTimer();
 }
+const GAME_TIMEOUT_S = 15; // timer max joueur en secondes
+
 function runTimer(){
   cancelAnimationFrame(timerRAF);
-  const tick=()=>{if(solved)return;const el=document.getElementById("timer");if(el)el.textContent=elapsed().toFixed(1)+" s";timerRAF=requestAnimationFrame(tick);};
+  const tick=()=>{
+    if(solved)return;
+    const t=elapsed();
+    const el=document.getElementById("timer");
+    if(el)el.textContent=t.toFixed(1)+" s";
+    // Timer expiré → révéler la réponse par superposition
+    if(t>=GAME_TIMEOUT_S){ timeOut(); return; }
+    timerRAF=requestAnimationFrame(tick);
+  };
   timerRAF=requestAnimationFrame(tick);
+}
+
+function timeOut(){
+  solved=true;
+  const fr=document.getElementById("frPlay");
+  // Superposer l'image originale en transparence par-dessus l'image modifiée
+  const overlay=document.createElement("img");
+  overlay.src=imgs.A.toDataURL();
+  overlay.style.cssText="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:3;opacity:0.5;pointer-events:none;";
+  fr.appendChild(overlay);
+  // Afficher la zone
+  drawMarker(fr,puzzle.cx,puzzle.cy,puzzle.r,"correct");
+  const ps=document.getElementById("playStatus");
+  ps.className="status miss";
+  ps.innerHTML="<span>Temps écoulé !</span><span class='meta'>voilà où c'était</span>";
 }
 function handleGuess(e){
   if(phase!=="guess"||solved)return;
