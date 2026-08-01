@@ -295,36 +295,11 @@ document.getElementById("fileB").onchange=e=>{
     setTimeout(initDrawCanvas,50);
   });
 };
-document.getElementById("btnConfirm").onclick=()=>{
-  if(!pendingZone||!maskCanvas)return;
-  puzzle={...pendingZone,maskData:maskCanvas.toDataURL()};
-  // Repeindre en vert
-  const W=maskCanvas.width,H=maskCanvas.height;
-  const id=mctx.getImageData(0,0,W,H);
-  const out=dctx.createImageData(W,H);
-  for(let i=0;i<id.data.length;i+=4){
-    const p=id.data[i]>128;
-    out.data[i]=p?35:0;out.data[i+1]=p?165:0;out.data[i+2]=p?133:0;out.data[i+3]=p?120:0;
-    if(p){
-      const x=(i/4)%W,y=Math.floor((i/4)/W);
-      if(x>0&&x<W-1&&y>0&&y<H-1){
-        const border=id.data[i-4]<=128||id.data[i+4]<=128||id.data[i-W*4]<=128||id.data[i+W*4]<=128;
-        if(border) out.data[i+3]=240;
-      }
-    }
-  }
-  dctx.putImageData(out,0,0);
-  document.getElementById("btnConfirm").classList.add("hide");
-  const st=document.getElementById("createStatus");st.classList.remove("hide");
-  st.className="status win";
-  st.innerHTML="<span>✓ Puzzle prêt</span><span class='meta'>passe à l'onglet Joueur</span>";
-};
 document.getElementById("btnRestart").onclick=resetCreator;
 function resetCreator(){
   stopCamera(); imgs.A=null; imgs.B=null; puzzle=null; pendingMark=null; creatorStep="idle";
   isDrawing=false;
-  pendingZone=null;
-  document.getElementById("btnConfirm").classList.add("hide");
+  const dc=document.getElementById("drawCanvas");
   if(dctx) dctx.clearRect(0,0,dc.width,dc.height);
   dc.classList.add("hide");
   clearMarkers(document.getElementById("frCap"));
@@ -406,36 +381,28 @@ function endDraw(e){
   setTimeout(()=>{
     const v=verifyZone(zone);
     const st=document.getElementById("createStatus");st.classList.remove("hide");
+    clearMarkers(document.getElementById("frCap"));
     if(v.ok){
       puzzle={cx:zone.cx,cy:zone.cy,r:zone.r,maskData:maskCanvas.toDataURL()};
       const out=dctx.createImageData(W,H);
       const id2=mctx.getImageData(0,0,W,H);
       for(let i=0;i<id2.data.length;i+=4){
         const p=id2.data[i]>128;
-        out.data[i]=p?35:0;out.data[i+1]=p?165:0;out.data[i+2]=p?133:0;out.data[i+3]=p?120:0;
-        if(p){
-          const x=(i/4)%W,y=Math.floor((i/4)/W);
-          if(x>0&&x<W-1&&y>0&&y<H-1){
-            const border=id2.data[i-4]<=128||id2.data[i+4]<=128||id2.data[i-W*4]<=128||id2.data[i+W*4]<=128;
-            if(border) out.data[i+3]=240;
-          }
-        }
+        out.data[i]=p?35:0;out.data[i+1]=p?165:0;out.data[i+2]=p?133:0;out.data[i+3]=p?80:0;
       }
       dctx.putImageData(out,0,0);
       st.className="status win";
-      st.innerHTML="<span>✓ Puzzle prêt</span><span class='meta'>passe à l'onglet Joueur</span>";
+      st.innerHTML="<span>✓ Changement confirmé — puzzle prêt</span><span class='meta'>passe à l'onglet Joueur</span>";
     }else{
       puzzle=null;
       dctx.clearRect(0,0,W,H);
       mctx.fillStyle="#000";mctx.fillRect(0,0,W,H);
       st.className="status miss";
-      st.innerHTML="<span>Rien détecté — réessaie ou agrandis la zone</span>";
-      setTimeout(()=>document.getElementById("markInvite").classList.remove("hide"),1200);
+      st.innerHTML="<span>Rien détecté ici — réessaie</span><span class='meta'>peins sur l'objet changé</span>";
+      setTimeout(()=>document.getElementById("markInvite").classList.remove("hide"),1500);
     }
   },80);
 }
-
-let pendingZone=null;
 drawCanvas.addEventListener("mousedown",startDraw);
 drawCanvas.addEventListener("mousemove",moveDraw);
 drawCanvas.addEventListener("mouseup",endDraw);
@@ -524,9 +491,9 @@ function verifyZone(zone){
   const bgMean=bgScores.length?bgScores.reduce((s,v)=>s+v,0)/bgScores.length:0;
 
   // La zone doit sortir clairement au-dessus des zones témoins
-  const FLOOR=8;            // très bas — accepte les petits changements
-  const RATIO_MEAN=1.4;     // zone doit juste légèrement sortir du fond
-  const RATIO_MAX=1.0;      // doit juste égaler la meilleure zone témoin
+  const FLOOR=14;           // différence absolue minimale
+  const RATIO_MEAN=1.8;     // vs moyenne des zones témoins
+  const RATIO_MAX=1.2;      // vs la meilleure zone témoin
   const ok=zScore>FLOOR && zScore>bgMean*RATIO_MEAN && zScore>bgMax*RATIO_MAX;
   return{ok, zScore, bgMean, bgMax};
 }
