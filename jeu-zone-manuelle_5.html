@@ -203,7 +203,7 @@ function checkSimilarity(){
   const meanDiff=sum/N;
   // meanDiff : 0=identique, ~50=changement énorme, ~15=scène similaire avec petite modif
   // On accepte jusqu'à 30 (marge généreuse pour la lumière + un objet changé)
-  return{ok:meanDiff<30, diff:meanDiff};
+  return{ok:meanDiff<45, diff:meanDiff};
 }
 
 /* ---- Flux créateur ---- */
@@ -438,27 +438,64 @@ function bestAlign(ga,gb){
   return best;
 }
 function verifyZone(zone){
-  const ga=grayBlur(imgs.A),gb=grayBlur(imgs.B);
+  const ga=grayBlur(imgs.A), gb=grayBlur(imgs.B);
   const {ox,oy}=bestAlign(ga,gb);
   const r2=zone.r*zone.r;
-  let zoneDiffs=[],bSum=0,bN=0;
+
+  // Calculer le score de différence moyen dans la zone cible
+  let zDiffs=[];
   for(let y=0;y<workH;y++){
-    const yb=y+oy;if(yb<0||yb>=workH)continue;
+    const yb=y+oy; if(yb<0||yb>=workH)continue;
     for(let x=0;x<WORK_W;x++){
-      const xb=x+ox;if(xb<0||xb>=WORK_W)continue;
-      const d=Math.abs(ga[y*WORK_W+x]-gb[yb*WORK_W+xb]);
-      if((x-zone.cx)*(x-zone.cx)+(y-zone.cy)*(y-zone.cy)<=r2){zoneDiffs.push(d);}
-      else{bSum+=d;bN++;}
+      const xb=x+ox; if(xb<0||xb>=WORK_W)continue;
+      if((x-zone.cx)*(x-zone.cx)+(y-zone.cy)*(y-zone.cy)<=r2){
+        zDiffs.push(Math.abs(ga[y*WORK_W+x]-gb[yb*WORK_W+xb]));
+      }
     }
   }
-  // Moyenne des 20% pixels les plus différents dans la zone (résistant au bruit)
-  zoneDiffs.sort((a,b)=>b-a);
-  const top=Math.max(1,Math.floor(zoneDiffs.length*0.20));
-  const topMean=zoneDiffs.slice(0,top).reduce((s,v)=>s+v,0)/top;
-  const bgMean=bN?bSum/bN:0;
-  // Seuils stricts : le vrai changement doit vraiment ressortir
-  const FLOOR=25, RATIO=3.5;
-  return{ok:topMean>FLOOR&&topMean>bgMean*RATIO, topMean, bgMean};
+  if(zDiffs.length===0) return{ok:false};
+  // Score = moyenne des 25% pixels les plus différents de la zone
+  zDiffs.sort((a,b)=>b-a);
+  const top=Math.max(1,Math.floor(zDiffs.length*0.25));
+  const zScore=zDiffs.slice(0,top).reduce((s,v)=>s+v,0)/top;
+
+  // Comparer à 8 zones témoins aléatoires de même taille ailleurs dans l'image
+  const r=zone.r;
+  const margin=r+5;
+  const candidates=[
+    {cx:margin,cy:margin},{cx:WORK_W-margin,cy:margin},
+    {cx:margin,cy:workH-margin},{cx:WORK_W-margin,cy:workH-margin},
+    {cx:WORK_W/2,cy:margin},{cx:WORK_W/2,cy:workH-margin},
+    {cx:margin,cy:workH/2},{cx:WORK_W-margin,cy:workH/2},
+  ];
+  const bgScores=[];
+  for(const c of candidates){
+    // Exclure si trop proche de la zone cible
+    const dist=Math.sqrt((c.cx-zone.cx)**2+(c.cy-zone.cy)**2);
+    if(dist<r*2) continue;
+    let diffs=[];
+    for(let y=Math.max(0,Math.floor(c.cy-r));y<Math.min(workH,Math.ceil(c.cy+r));y++){
+      const yb=y+oy; if(yb<0||yb>=workH)continue;
+      for(let x=Math.max(0,Math.floor(c.cx-r));x<Math.min(WORK_W,Math.ceil(c.cx+r));x++){
+        const xb=x+ox; if(xb<0||xb>=WORK_W)continue;
+        if((x-c.cx)*(x-c.cx)+(y-c.cy)*(y-c.cy)<=r2)
+          diffs.push(Math.abs(ga[y*WORK_W+x]-gb[yb*WORK_W+xb]));
+      }
+    }
+    if(diffs.length===0) continue;
+    diffs.sort((a,b)=>b-a);
+    const t=Math.max(1,Math.floor(diffs.length*0.25));
+    bgScores.push(diffs.slice(0,t).reduce((s,v)=>s+v,0)/t);
+  }
+  const bgMax=bgScores.length?Math.max(...bgScores):0;
+  const bgMean=bgScores.length?bgScores.reduce((s,v)=>s+v,0)/bgScores.length:0;
+
+  // La zone doit sortir clairement au-dessus des zones témoins
+  const FLOOR=20;           // différence absolue minimale
+  const RATIO_MEAN=2.8;     // vs moyenne des zones témoins
+  const RATIO_MAX=1.6;      // vs la meilleure zone témoin (la plus bruitée)
+  const ok=zScore>FLOOR && zScore>bgMean*RATIO_MEAN && zScore>bgMax*RATIO_MAX;
+  return{ok, zScore, bgMean, bgMax};
 }
 
 /* ---- Joueur (mode mémoire) ---- */
