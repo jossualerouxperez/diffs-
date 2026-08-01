@@ -434,16 +434,12 @@ function verifyZone(zone){
     }
   }
   if(!zDiffs.length)return{ok:false};
-  zDiffs.sort((a,b)=>b-a);
-  const zScore = zDiffs.length<40
-    ? zDiffs[0]
-    : zDiffs.slice(0,Math.floor(zDiffs.length*0.25)).reduce((s,v)=>s+v,0)/Math.floor(zDiffs.length*0.25);
-  const nRef = nDiffs.length
-    ? (nDiffs.sort((a,b)=>b-a).slice(0,Math.floor(nDiffs.length*0.25)).reduce((s,v)=>s+v,0)/Math.max(1,Math.floor(nDiffs.length*0.25)))
-    : 0;
-  const FLOOR = zDiffs.length<40 ? 16 : 12;
-  const RATIO = 1.4;
-  return{ok: zScore>FLOOR && zScore>nRef*RATIO, zScore, nRef};
+  // Pic max dans la zone — marche pour ajout ET suppression
+  const peak=Math.max(...zDiffs);
+  // Moyenne des voisins immédiats
+  const nMean=nDiffs.length?nDiffs.reduce((s,v)=>s+v,0)/nDiffs.length:0;
+  // Très permissif : un seul pixel qui ressort suffit
+  return{ok: peak>10 && peak>nMean*1.2, peak, nMean};
 }
 
 function revealZone(frame){
