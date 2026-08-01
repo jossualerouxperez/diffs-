@@ -432,18 +432,16 @@ function verifyZone(zone){
     }
   }
   if(!zDiffs.length)return{ok:false};
-  // Moyenne des 25% pixels les plus différents dans la zone
+  // Pour les petites zones : prendre plus de pixels (top 40%), pour les grandes : top 20%
+  const zPct=zDiffs.length<50?0.40:0.25;
   zDiffs.sort((a,b)=>b-a);
-  const zt=Math.max(1,Math.floor(zDiffs.length*0.25));
+  const zt=Math.max(1,Math.floor(zDiffs.length*zPct));
   const zScore=zDiffs.slice(0,zt).reduce((s,v)=>s+v,0)/zt;
-  // Moyenne des 25% pixels les plus différents dans le FOND
-  // (compare la zone aux pixels qui diffèrent le plus dans le fond = seuil équitable)
   bDiffs.sort((a,b)=>b-a);
   const bt=Math.max(1,Math.floor(bDiffs.length*0.25));
   const bScore=bDiffs.slice(0,bt).reduce((s,v)=>s+v,0)/bt;
-  // Seuil équilibré : zone doit sortir au-dessus du fond de manière significative
-  const FLOOR=15;
-  const RATIO=1.6;
+  const FLOOR=13;
+  const RATIO=1.5;
   return{ok: zScore>FLOOR && zScore>bScore*RATIO, zScore, bScore};
 }
 
