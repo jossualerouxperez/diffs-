@@ -383,7 +383,7 @@ function endDraw(e){
     const st=document.getElementById("createStatus");st.classList.remove("hide");
     clearMarkers(document.getElementById("frCap"));
     if(v.ok){
-      puzzle=zone;
+      puzzle={cx:zone.cx,cy:zone.cy,r:zone.r,maskData:maskCanvas.toDataURL()};
       const out=dctx.createImageData(W,H);
       const id2=mctx.getImageData(0,0,W,H);
       for(let i=0;i<id2.data.length;i+=4){
@@ -491,11 +491,53 @@ function verifyZone(zone){
   const bgMean=bgScores.length?bgScores.reduce((s,v)=>s+v,0)/bgScores.length:0;
 
   // La zone doit sortir clairement au-dessus des zones témoins
-  const FLOOR=20;           // différence absolue minimale
-  const RATIO_MEAN=2.8;     // vs moyenne des zones témoins
-  const RATIO_MAX=1.6;      // vs la meilleure zone témoin (la plus bruitée)
+  const FLOOR=14;           // différence absolue minimale
+  const RATIO_MEAN=1.8;     // vs moyenne des zones témoins
+  const RATIO_MAX=1.2;      // vs la meilleure zone témoin
   const ok=zScore>FLOOR && zScore>bgMean*RATIO_MEAN && zScore>bgMax*RATIO_MAX;
   return{ok, zScore, bgMean, bgMax};
+}
+
+/* ---- Révélation de la zone peinte côté joueur ---- */
+function revealZone(frame){
+  if(!puzzle)return;
+  if(puzzle.maskData){
+    const rect=frame.getBoundingClientRect();
+    const ov=document.createElement("canvas");
+    ov.className="zone-overlay";
+    ov.style.cssText="position:absolute;inset:0;width:100%;height:100%;z-index:4;pointer-events:none;";
+    ov.width=rect.width; ov.height=rect.height;
+    const oc=ov.getContext("2d");
+    const mask=new Image();
+    mask.onload=()=>{
+      const tmp=document.createElement("canvas");
+      tmp.width=rect.width; tmp.height=rect.height;
+      const tc=tmp.getContext("2d");
+      tc.drawImage(mask,0,0,rect.width,rect.height);
+      const id=tc.getImageData(0,0,rect.width,rect.height);
+      const out=oc.createImageData(rect.width,rect.height);
+      const W=rect.width;
+      for(let i=0;i<id.data.length;i+=4){
+        const painted=id.data[i]>128;
+        out.data[i]=painted?35:0; out.data[i+1]=painted?165:0;
+        out.data[i+2]=painted?133:0; out.data[i+3]=painted?150:0;
+        if(painted){
+          const x=(i/4)%W, y=Math.floor((i/4)/W);
+          if(x>0&&x<W-1&&y>0&&y<rect.height-1){
+            const border=id.data[i-4]<=128||id.data[i+4]<=128||
+              id.data[i-W*4]<=128||id.data[i+W*4]<=128;
+            if(border){out.data[i+3]=240;}
+          }
+        }
+      }
+      oc.putImageData(out,0,0);
+    };
+    mask.src=puzzle.maskData;
+    frame.querySelectorAll(".zone-overlay").forEach(n=>n.remove());
+    frame.appendChild(ov);
+  } else {
+    drawMarker(frame,puzzle.cx,puzzle.cy,puzzle.r,"correct");
+  }
 }
 
 /* ---- Joueur (mode mémoire) ---- */
@@ -516,7 +558,7 @@ function hideBar(){document.getElementById("progressBar").classList.add("hide");
 function setupPlay(){
   cancelPlay();
   const fr=document.getElementById("frPlay");
-  clearMarkers(fr);fr.querySelectorAll("img:not(.ghost)[style]").forEach(n=>n.remove());
+  clearMarkers(fr);fr.querySelectorAll("img:not(.ghost)[style],.zone-overlay").forEach(n=>n.remove());
   document.getElementById("countdown").classList.add("hide");
   document.getElementById("blackout").classList.add("hide");
   hideBar();solved=false;phase="idle";
@@ -568,7 +610,7 @@ function timeOut(){
   overlay.src=imgs.A.toDataURL();
   overlay.style.cssText="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:3;opacity:0.5;pointer-events:none;";
   fr.appendChild(overlay);
-  drawMarker(fr,puzzle.cx,puzzle.cy,puzzle.r,"correct");
+  revealZone(fr);
   const ps=document.getElementById("playStatus");
   ps.className="status miss";ps.innerHTML="<span>Temps écoulé !</span><span class='meta'>voilà où c'était</span>";
 }
@@ -598,7 +640,7 @@ document.getElementById("btnReveal").onclick=()=>{
   document.getElementById("countdown").classList.add("hide");
   document.getElementById("blackout").classList.add("hide");
   putImage(fr,imgs.B);document.getElementById("playTag").textContent="Modifié";
-  solved=true;phase="idle";drawMarker(fr,puzzle.cx,puzzle.cy,puzzle.r,"correct");
+  solved=true;phase="idle";revealZone(fr);
   document.getElementById("playStatus").className="status";
   document.getElementById("playStatus").innerHTML="<span>Voilà la zone</span>";
 };
