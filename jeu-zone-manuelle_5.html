@@ -421,24 +421,30 @@ function verifyZone(zone){
   const ga=grayBlur(imgs.A),gb=grayBlur(imgs.B);
   const {ox,oy}=bestAlign(ga,gb);
   const r2=zone.r*zone.r;
-  // Score de la zone : pic max dans la zone (robuste pour petits objets)
-  let peak=0, bSum=0, bN=0;
+  let zDiffs=[], bDiffs=[];
   for(let y=0;y<workH;y++){
     const yb=y+oy;if(yb<0||yb>=workH)continue;
     for(let x=0;x<WORK_W;x++){
       const xb=x+ox;if(xb<0||xb>=WORK_W)continue;
       const d=Math.abs(ga[y*WORK_W+x]-gb[yb*WORK_W+xb]);
-      if((x-zone.cx)*(x-zone.cx)+(y-zone.cy)*(y-zone.cy)<=r2){
-        if(d>peak)peak=d;
-      } else { bSum+=d; bN++; }
+      if((x-zone.cx)*(x-zone.cx)+(y-zone.cy)*(y-zone.cy)<=r2) zDiffs.push(d);
+      else bDiffs.push(d);
     }
   }
-  const bgMean=bN?bSum/bN:0;
-  // Très permissif : un seul pixel qui ressort clairement suffit
-  // FLOOR bas + ratio faible = petits changements passent
-  const FLOOR=12;
-  const RATIO=1.8;
-  return{ok: peak>FLOOR && peak>bgMean*RATIO, peak, bgMean};
+  if(!zDiffs.length)return{ok:false};
+  // Moyenne des 25% pixels les plus différents dans la zone
+  zDiffs.sort((a,b)=>b-a);
+  const zt=Math.max(1,Math.floor(zDiffs.length*0.25));
+  const zScore=zDiffs.slice(0,zt).reduce((s,v)=>s+v,0)/zt;
+  // Moyenne des 25% pixels les plus différents dans le FOND
+  // (compare la zone aux pixels qui diffèrent le plus dans le fond = seuil équitable)
+  bDiffs.sort((a,b)=>b-a);
+  const bt=Math.max(1,Math.floor(bDiffs.length*0.25));
+  const bScore=bDiffs.slice(0,bt).reduce((s,v)=>s+v,0)/bt;
+  // Seuil équilibré : zone doit sortir au-dessus du fond de manière significative
+  const FLOOR=15;
+  const RATIO=1.6;
+  return{ok: zScore>FLOOR && zScore>bScore*RATIO, zScore, bScore};
 }
 
 function revealZone(frame){
