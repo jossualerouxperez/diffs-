@@ -82,8 +82,6 @@
     <button id="tabCreate" class="on">Créateur</button>
     <button id="tabPlay">Joueur</button>
   </div>
-
-  <!-- CRÉATEUR -->
   <section id="create">
     <h2>Crée ton puzzle</h2>
     <p class="sub" id="createSub">Prends la photo de ta scène. Change ensuite un seul truc.</p>
@@ -112,8 +110,6 @@
     </div>
     <div class="status hide" id="createStatus"></div>
   </section>
-
-  <!-- JOUEUR -->
   <section id="play" class="hide">
     <h2>Mémorise puis retrouve</h2>
     <p class="sub" id="playSub">Observe bien l'original… il va disparaître.</p>
@@ -131,14 +127,12 @@
     </div>
   </section>
 </div>
-
 <script>
 "use strict";
 const WORK_W=320; let workH=240, aspectSet=false;
 const imgs={A:null,B:null}; let puzzle=null, activeStream=null;
 let creatorStep="idle", pendingMark=null;
 
-/* ---- Image ---- */
 function setAspect(w,h){
   if(aspectSet)return; workH=Math.max(80,Math.round(WORK_W*h/w)); aspectSet=true;
   document.querySelectorAll(".frame").forEach(f=>f.style.aspectRatio=WORK_W+"/"+workH);
@@ -160,7 +154,6 @@ function loadFile(slot,file,done){
   im.src=url;
 }
 
-/* ---- Caméra ---- */
 const video=document.getElementById("video");
 const ghost=document.getElementById("ghost");
 const capTag=document.getElementById("capTag");
@@ -186,7 +179,6 @@ function stopCamera(){
   video.style.display="none";
 }
 
-/* ---- Vérification ressemblance globale entre les deux photos ---- */
 function grayImg(canvas){
   const d=canvas.getContext("2d").getImageData(0,0,WORK_W,workH).data;
   const N=WORK_W*workH, g=new Float32Array(N);
@@ -194,19 +186,12 @@ function grayImg(canvas){
   return g;
 }
 function checkSimilarity(){
-  // Compare les deux images en niveaux de gris
-  // Si la différence moyenne est trop grande → pas la même scène
   const ga=grayImg(imgs.A), gb=grayImg(imgs.B);
-  const N=WORK_W*workH;
-  let sum=0;
+  const N=WORK_W*workH; let sum=0;
   for(let i=0;i<N;i++) sum+=Math.abs(ga[i]-gb[i]);
-  const meanDiff=sum/N;
-  // meanDiff : 0=identique, ~50=changement énorme, ~15=scène similaire avec petite modif
-  // On accepte jusqu'à 30 (marge généreuse pour la lumière + un objet changé)
-  return{ok:meanDiff<45, diff:meanDiff};
+  return{ok:(sum/N)<45};
 }
 
-/* ---- Flux créateur ---- */
 function startCreator(){
   creatorStep="camA";
   capTag.textContent="Avant"; capTag.classList.remove("hide");
@@ -228,18 +213,13 @@ function handleShutter(){
   } else if(creatorStep==="camB"){
     const c=toWork(video,video.videoWidth,video.videoHeight);
     imgs.B=c;
-    // Vérifier que les deux photos se ressemblent avant de continuer
     const sim=checkSimilarity();
     if(!sim.ok){
-      // Photos trop différentes — afficher erreur et laisser reprendre
       const st=document.getElementById("createStatus"); st.classList.remove("hide");
       st.className="status miss";
       st.innerHTML="<span>Les deux photos sont trop différentes</span><span class='meta'>réaligne mieux sur le fantôme</span>";
-      // Laisser la caméra ouverte pour qu'il reprenne
-      imgs.B=null;
-      return;
+      imgs.B=null; return;
     }
-    // Photos similaires → on continue
     document.getElementById("createStatus").classList.add("hide");
     stopCamera();
     ghost.classList.add("hide"); hintGhost.classList.add("hide");
@@ -273,15 +253,12 @@ document.getElementById("fileA").onchange=e=>{
 document.getElementById("fileB").onchange=e=>{
   if(!e.target.files[0])return;
   loadFile("B",e.target.files[0],()=>{
-    // Vérifier ressemblance à l'import aussi
     const sim=checkSimilarity();
     const st=document.getElementById("createStatus"); st.classList.remove("hide");
     if(!sim.ok){
-      imgs.B=null;
-      st.className="status miss";
+      imgs.B=null; st.className="status miss";
       st.innerHTML="<span>Les deux photos sont trop différentes</span><span class='meta'>recadre-toi sur la même scène</span>";
-      document.getElementById("btnImportB").classList.remove("hide");
-      return;
+      document.getElementById("btnImportB").classList.remove("hide"); return;
     }
     st.classList.add("hide");
     putImage(document.getElementById("frCap"),imgs.B);
@@ -295,36 +272,11 @@ document.getElementById("fileB").onchange=e=>{
     setTimeout(initDrawCanvas,50);
   });
 };
-document.getElementById("btnConfirm").onclick=()=>{
-  if(!pendingZone||!maskCanvas)return;
-  puzzle={...pendingZone,maskData:maskCanvas.toDataURL()};
-  // Repeindre en vert
-  const W=maskCanvas.width,H=maskCanvas.height;
-  const id=mctx.getImageData(0,0,W,H);
-  const out=dctx.createImageData(W,H);
-  for(let i=0;i<id.data.length;i+=4){
-    const p=id.data[i]>128;
-    out.data[i]=p?35:0;out.data[i+1]=p?165:0;out.data[i+2]=p?133:0;out.data[i+3]=p?120:0;
-    if(p){
-      const x=(i/4)%W,y=Math.floor((i/4)/W);
-      if(x>0&&x<W-1&&y>0&&y<H-1){
-        const border=id.data[i-4]<=128||id.data[i+4]<=128||id.data[i-W*4]<=128||id.data[i+W*4]<=128;
-        if(border) out.data[i+3]=240;
-      }
-    }
-  }
-  dctx.putImageData(out,0,0);
-  document.getElementById("btnConfirm").classList.add("hide");
-  const st=document.getElementById("createStatus");st.classList.remove("hide");
-  st.className="status win";
-  st.innerHTML="<span>✓ Puzzle prêt</span><span class='meta'>passe à l'onglet Joueur</span>";
-};
 document.getElementById("btnRestart").onclick=resetCreator;
 function resetCreator(){
   stopCamera(); imgs.A=null; imgs.B=null; puzzle=null; pendingMark=null; creatorStep="idle";
   isDrawing=false;
-  pendingZone=null;
-  document.getElementById("btnConfirm").classList.add("hide");
+  const dc=document.getElementById("drawCanvas");
   if(dctx) dctx.clearRect(0,0,dc.width,dc.height);
   dc.classList.add("hide");
   clearMarkers(document.getElementById("frCap"));
@@ -340,7 +292,6 @@ function resetCreator(){
   btnShutter.disabled=true;
 }
 
-/* ---- Pinceau de zone ---- */
 const BRUSH_R=22;
 let isDrawing=false, paintedPixels=null;
 const drawCanvas=document.getElementById("drawCanvas");
@@ -355,8 +306,7 @@ function initDrawCanvas(){
   maskCanvas.width=fr.width; maskCanvas.height=fr.height;
   mctx=maskCanvas.getContext("2d");
   mctx.fillStyle="#000"; mctx.fillRect(0,0,fr.width,fr.height);
-  paintedPixels=null;
-  redrawZone();
+  paintedPixels=null; redrawZone();
 }
 function redrawZone(){
   dctx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
@@ -365,14 +315,14 @@ function redrawZone(){
   const id=mctx.getImageData(0,0,W,H);
   const out=dctx.createImageData(W,H);
   for(let i=0;i<id.data.length;i+=4){
-    const painted=id.data[i]>128;
-    out.data[i]=painted?62:0;out.data[i+1]=painted?123:0;out.data[i+2]=painted?214:0;out.data[i+3]=painted?140:0;
+    const p=id.data[i]>128;
+    out.data[i]=p?62:0;out.data[i+1]=p?123:0;out.data[i+2]=p?214:0;out.data[i+3]=p?140:0;
   }
   for(let y=1;y<H-1;y++) for(let x=1;x<W-1;x++){
     const p=(y*W+x)*4;
     if(id.data[p]>128){
-      const border=id.data[((y-1)*W+x)*4]<=128||id.data[((y+1)*W+x)*4]<=128||id.data[(y*W+x-1)*4]<=128||id.data[(y*W+x+1)*4]<=128;
-      if(border){out.data[p]=62;out.data[p+1]=123;out.data[p+2]=214;out.data[p+3]=230;}
+      const b=id.data[((y-1)*W+x)*4]<=128||id.data[((y+1)*W+x)*4]<=128||id.data[(y*W+x-1)*4]<=128||id.data[(y*W+x+1)*4]<=128;
+      if(b){out.data[p]=62;out.data[p+1]=123;out.data[p+2]=214;out.data[p+3]=230;}
     }
   }
   dctx.putImageData(out,0,0);
@@ -416,8 +366,8 @@ function endDraw(e){
         if(p){
           const x=(i/4)%W,y=Math.floor((i/4)/W);
           if(x>0&&x<W-1&&y>0&&y<H-1){
-            const border=id2.data[i-4]<=128||id2.data[i+4]<=128||id2.data[i-W*4]<=128||id2.data[i+W*4]<=128;
-            if(border) out.data[i+3]=240;
+            const b=id2.data[i-4]<=128||id2.data[i+4]<=128||id2.data[i-W*4]<=128||id2.data[i+W*4]<=128;
+            if(b) out.data[i+3]=240;
           }
         }
       }
@@ -434,8 +384,6 @@ function endDraw(e){
     }
   },80);
 }
-
-let pendingZone=null;
 drawCanvas.addEventListener("mousedown",startDraw);
 drawCanvas.addEventListener("mousemove",moveDraw);
 drawCanvas.addEventListener("mouseup",endDraw);
@@ -443,7 +391,6 @@ drawCanvas.addEventListener("touchstart",startDraw,{passive:false});
 drawCanvas.addEventListener("touchmove",moveDraw,{passive:false});
 drawCanvas.addEventListener("touchend",endDraw,{passive:false});
 
-/* ---- Vérificateur zone ---- */
 function grayBlur(canvas){
   const d=canvas.getContext("2d").getImageData(0,0,WORK_W,workH).data;
   const N=WORK_W*workH,g=new Float32Array(N);
@@ -471,67 +418,29 @@ function bestAlign(ga,gb){
   return best;
 }
 function verifyZone(zone){
-  const ga=grayBlur(imgs.A), gb=grayBlur(imgs.B);
+  const ga=grayBlur(imgs.A),gb=grayBlur(imgs.B);
   const {ox,oy}=bestAlign(ga,gb);
   const r2=zone.r*zone.r;
-
-  // Calculer le score de différence moyen dans la zone cible
-  let zDiffs=[];
+  // Score de la zone : pic max dans la zone (robuste pour petits objets)
+  let peak=0, bSum=0, bN=0;
   for(let y=0;y<workH;y++){
-    const yb=y+oy; if(yb<0||yb>=workH)continue;
+    const yb=y+oy;if(yb<0||yb>=workH)continue;
     for(let x=0;x<WORK_W;x++){
-      const xb=x+ox; if(xb<0||xb>=WORK_W)continue;
+      const xb=x+ox;if(xb<0||xb>=WORK_W)continue;
+      const d=Math.abs(ga[y*WORK_W+x]-gb[yb*WORK_W+xb]);
       if((x-zone.cx)*(x-zone.cx)+(y-zone.cy)*(y-zone.cy)<=r2){
-        zDiffs.push(Math.abs(ga[y*WORK_W+x]-gb[yb*WORK_W+xb]));
-      }
+        if(d>peak)peak=d;
+      } else { bSum+=d; bN++; }
     }
   }
-  if(zDiffs.length===0) return{ok:false};
-  // Score = moyenne des 25% pixels les plus différents de la zone
-  zDiffs.sort((a,b)=>b-a);
-  const top=Math.max(1,Math.floor(zDiffs.length*0.25));
-  const zScore=zDiffs.slice(0,top).reduce((s,v)=>s+v,0)/top;
-
-  // Comparer à 8 zones témoins aléatoires de même taille ailleurs dans l'image
-  const r=zone.r;
-  const margin=r+5;
-  const candidates=[
-    {cx:margin,cy:margin},{cx:WORK_W-margin,cy:margin},
-    {cx:margin,cy:workH-margin},{cx:WORK_W-margin,cy:workH-margin},
-    {cx:WORK_W/2,cy:margin},{cx:WORK_W/2,cy:workH-margin},
-    {cx:margin,cy:workH/2},{cx:WORK_W-margin,cy:workH/2},
-  ];
-  const bgScores=[];
-  for(const c of candidates){
-    // Exclure si trop proche de la zone cible
-    const dist=Math.sqrt((c.cx-zone.cx)**2+(c.cy-zone.cy)**2);
-    if(dist<r*2) continue;
-    let diffs=[];
-    for(let y=Math.max(0,Math.floor(c.cy-r));y<Math.min(workH,Math.ceil(c.cy+r));y++){
-      const yb=y+oy; if(yb<0||yb>=workH)continue;
-      for(let x=Math.max(0,Math.floor(c.cx-r));x<Math.min(WORK_W,Math.ceil(c.cx+r));x++){
-        const xb=x+ox; if(xb<0||xb>=WORK_W)continue;
-        if((x-c.cx)*(x-c.cx)+(y-c.cy)*(y-c.cy)<=r2)
-          diffs.push(Math.abs(ga[y*WORK_W+x]-gb[yb*WORK_W+xb]));
-      }
-    }
-    if(diffs.length===0) continue;
-    diffs.sort((a,b)=>b-a);
-    const t=Math.max(1,Math.floor(diffs.length*0.25));
-    bgScores.push(diffs.slice(0,t).reduce((s,v)=>s+v,0)/t);
-  }
-  const bgMax=bgScores.length?Math.max(...bgScores):0;
-  const bgMean=bgScores.length?bgScores.reduce((s,v)=>s+v,0)/bgScores.length:0;
-
-  // La zone doit sortir clairement au-dessus des zones témoins
-  const FLOOR=8;            // très bas — accepte les petits changements
-  const RATIO_MEAN=1.4;     // zone doit juste légèrement sortir du fond
-  const RATIO_MAX=1.0;      // doit juste égaler la meilleure zone témoin
-  const ok=zScore>FLOOR && zScore>bgMean*RATIO_MEAN && zScore>bgMax*RATIO_MAX;
-  return{ok, zScore, bgMean, bgMax};
+  const bgMean=bN?bSum/bN:0;
+  // Très permissif : un seul pixel qui ressort clairement suffit
+  // FLOOR bas + ratio faible = petits changements passent
+  const FLOOR=12;
+  const RATIO=1.8;
+  return{ok: peak>FLOOR && peak>bgMean*RATIO, peak, bgMean};
 }
 
-/* ---- Révélation de la zone peinte côté joueur ---- */
 function revealZone(frame){
   if(!puzzle)return;
   if(puzzle.maskData){
@@ -552,14 +461,13 @@ function revealZone(frame){
       const W=rect.width;
       for(let i=0;i<id.data.length;i+=4){
         const painted=id.data[i]>128;
-        out.data[i]=painted?35:0; out.data[i+1]=painted?165:0;
-        out.data[i+2]=painted?133:0; out.data[i+3]=painted?150:0;
+        out.data[i]=painted?35:0;out.data[i+1]=painted?165:0;
+        out.data[i+2]=painted?133:0;out.data[i+3]=painted?150:0;
         if(painted){
-          const x=(i/4)%W, y=Math.floor((i/4)/W);
+          const x=(i/4)%W,y=Math.floor((i/4)/W);
           if(x>0&&x<W-1&&y>0&&y<rect.height-1){
-            const border=id.data[i-4]<=128||id.data[i+4]<=128||
-              id.data[i-W*4]<=128||id.data[i+W*4]<=128;
-            if(border){out.data[i+3]=240;}
+            const b=id.data[i-4]<=128||id.data[i+4]<=128||id.data[i-W*4]<=128||id.data[i+W*4]<=128;
+            if(b) out.data[i+3]=240;
           }
         }
       }
@@ -573,7 +481,6 @@ function revealZone(frame){
   }
 }
 
-/* ---- Joueur (mode mémoire) ---- */
 const MEMO_S=3,BLACK_S=3,GAME_TIMEOUT_S=6;
 const TAP_DELAY=1000,PENALTY_MS=3000;
 let startTime=0,timerRAF=0,solved=false,phase="idle";
@@ -639,10 +546,10 @@ function runTimer(){
 function timeOut(){
   solved=true;cancelAnimationFrame(timerRAF);hideBar();
   const fr=document.getElementById("frPlay");
-  const overlay=document.createElement("img");
-  overlay.src=imgs.A.toDataURL();
-  overlay.style.cssText="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:3;opacity:0.5;pointer-events:none;";
-  fr.appendChild(overlay);
+  const ov=document.createElement("img");
+  ov.src=imgs.A.toDataURL();
+  ov.style.cssText="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:3;opacity:0.5;pointer-events:none;";
+  fr.appendChild(ov);
   revealZone(fr);
   const ps=document.getElementById("playStatus");
   ps.className="status miss";ps.innerHTML="<span>Temps écoulé !</span><span class='meta'>voilà où c'était</span>";
@@ -679,7 +586,6 @@ document.getElementById("btnReveal").onclick=()=>{
 };
 document.getElementById("btnReplay").onclick=setupPlay;
 
-/* ---- Marqueurs & coords ---- */
 function eventToWork(e,frame){
   const r=frame.getBoundingClientRect();
   return{cx:(e.clientX-r.left)/r.width*WORK_W,cy:(e.clientY-r.top)/r.height*workH};
@@ -696,7 +602,6 @@ function drawMarker(frame,cx,cy,r,kind){
 }
 function clearMarkers(frame,keep){if(keep)return;frame.querySelectorAll(".marker").forEach(n=>n.remove());}
 
-/* ---- Onglets ---- */
 document.getElementById("tabCreate").onclick=()=>{
   document.getElementById("tabCreate").classList.add("on");
   document.getElementById("tabPlay").classList.remove("on");
