@@ -139,9 +139,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 "use strict";
-// --- Config Supabase : remplace ces deux valeurs par celles de ton projet ---
-// (Settings > API dans ton dashboard Supabase). Voir le script SQL fourni
-// pour créer la table + les policies nécessaires.
+// --- Config Supabase (déjà rempli avec ton projet) ---
 const SUPABASE_URL="https://vshfqziutghdfcszhvpn.supabase.co";
 const SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZzaGZxeml1dGdoZGZjc3podnBuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2NzkxODgsImV4cCI6MjEwMTI1NTE4OH0.QOukVXQLZiPYnpejVcUiV9xHkVzrYNe20TJ_SkSjsGs";
 const supabase=(window.supabase && !SUPABASE_URL.includes("YOUR-PROJECT"))
@@ -658,7 +656,7 @@ function generateId(){
 }
 async function sharePuzzle(){
   if(!supabase){
-    alert("Configure Supabase d'abord : renseigne SUPABASE_URL et SUPABASE_ANON_KEY en haut du fichier (voir le commentaire dans le script).");
+    alert("Configure Supabase d'abord : renseigne SUPABASE_URL et SUPABASE_ANON_KEY en haut du fichier.");
     return;
   }
   if(!puzzle||!imgs.A||!imgs.B) return;
