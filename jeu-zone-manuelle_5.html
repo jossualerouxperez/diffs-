@@ -45,7 +45,7 @@
     border:3px solid var(--blue);background:rgba(62,123,214,0.14);
     transform:translate(-50%,-50%);pointer-events:none;}
   .marker.correct{border-color:var(--green);background:rgba(35,165,133,0.16);}
-  .marker.miss{border-color:var(--red);background:rgba(192,57,43,0.14);}
+  .marker.miss{border-color:var(--red);background:rgba(192,57,43,0.14);border-width:1.5px;}
   .marker.miss-zone{border-color:var(--red);background:rgba(192,57,43,0.10);border-style:dashed;}
   .draw-canvas{position:absolute;inset:0;width:100%;height:100%;z-index:5;cursor:crosshair;touch-action:none;}
   .overlay{position:absolute;inset:0;z-index:6;display:flex;align-items:center;justify-content:center;}
@@ -598,7 +598,7 @@ function drawMarker(frame,cx,cy,r,kind){
   const m=document.createElement("div");
   m.className="marker"+(kind?" "+kind:"");
   if(kind!=="miss"&&kind!=="miss-zone"){m.style.width=(r*2*sx)+"px";m.style.height=(r*2*sy)+"px";}
-  else if(kind==="miss"){m.style.width="24px";m.style.height="24px";}
+  else if(kind==="miss"){m.style.width="14px";m.style.height="14px";}
   m.style.left=(cx*sx)+"px";m.style.top=(cy*sy)+"px";
   frame.appendChild(m);
 }
