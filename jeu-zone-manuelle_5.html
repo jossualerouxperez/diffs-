@@ -73,9 +73,6 @@
   @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.45;}}
   .hide{display:none!important;}
   input[type=file]{display:none;}
-  .share-box{display:flex;gap:8px;margin-top:8px;}
-  .share-box input{flex:1;min-width:0;font:inherit;font-size:12px;padding:9px 10px;
-    border-radius:10px;border:0.5px solid var(--line);color:var(--muted);background:#fafafa;}
 </style>
 </head>
 <body>
@@ -111,13 +108,6 @@
       </div>
     </div>
     <div class="status hide" id="createStatus"></div>
-    <div class="btns hide" id="shareRow" style="margin-top:8px">
-      <button class="act primary" id="btnShare">Partager le puzzle</button>
-    </div>
-    <div class="share-box hide" id="shareBox">
-      <input type="text" id="shareLink" readonly>
-      <button class="act" id="btnCopyLink">Copier</button>
-    </div>
   </section>
   <section id="play" class="hide">
     <h2>Mémorise puis retrouve</h2>
@@ -136,16 +126,8 @@
     </div>
   </section>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 "use strict";
-// --- Config Supabase (déjà rempli avec ton projet) ---
-const SUPABASE_URL="https://vshfqziutghdfcszhvpn.supabase.co";
-const SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZzaGZxeml1dGdoZGZjc3podnBuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2NzkxODgsImV4cCI6MjEwMTI1NTE4OH0.QOukVXQLZiPYnpejVcUiV9xHkVzrYNe20TJ_SkSjsGs";
-const supabase=(window.supabase && !SUPABASE_URL.includes("YOUR-PROJECT"))
-  ? window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY)
-  : null;
-
 const WORK_W=320; let workH=240, aspectSet=false;
 const imgs={A:null,B:null}; let puzzle=null, activeStream=null;
 let creatorStep="idle", pendingMark=null;
@@ -306,9 +288,6 @@ function resetCreator(){
   document.getElementById("markInvite").classList.add("hide");
   document.getElementById("markStep").classList.add("hide");
   document.getElementById("createStatus").classList.add("hide");
-  document.getElementById("shareRow").classList.add("hide");
-  document.getElementById("shareBox").classList.add("hide");
-  const bs=document.getElementById("btnShare"); bs.disabled=false; bs.textContent="Partager le puzzle";
   btnShutter.disabled=true;
 }
 
@@ -394,7 +373,6 @@ function endDraw(e){
       dctx.putImageData(out,0,0);
       st.className="status win";
       st.innerHTML="<span>✓ Puzzle prêt</span><span class='meta'>passe à l'onglet Joueur</span>";
-      document.getElementById("shareRow").classList.remove("hide");
     }else{
       puzzle=null;
       dctx.clearRect(0,0,W,H);
@@ -648,103 +626,7 @@ document.getElementById("tabPlay").onclick=()=>{
   stopCamera();setupPlay();
 };
 
-function generateId(){
-  const chars="abcdefghjkmnpqrstuvwxyz23456789";
-  const arr=new Uint8Array(8); crypto.getRandomValues(arr);
-  let s=""; for(let i=0;i<8;i++) s+=chars[arr[i]%chars.length];
-  return s;
-}
-async function sharePuzzle(){
-  if(!supabase){
-    alert("Configure Supabase d'abord : renseigne SUPABASE_URL et SUPABASE_ANON_KEY en haut du fichier.");
-    return;
-  }
-  if(!puzzle||!imgs.A||!imgs.B) return;
-  const btn=document.getElementById("btnShare");
-  btn.disabled=true; btn.textContent="Envoi…";
-  try{
-    const id=generateId();
-    const row={
-      id,
-      img_a:imgs.A.toDataURL("image/jpeg",0.82),
-      img_b:imgs.B.toDataURL("image/jpeg",0.82),
-      mask:puzzle.maskData,
-      cx:puzzle.cx, cy:puzzle.cy, r:puzzle.r,
-      work_h:workH
-    };
-    const{error}=await supabase.from("puzzles").insert(row);
-    if(error) throw error;
-    const url=location.origin+location.pathname+"?id="+id;
-    document.getElementById("shareBox").classList.remove("hide");
-    document.getElementById("shareLink").value=url;
-    btn.textContent="Partager le puzzle"; btn.disabled=false;
-  }catch(e){
-    btn.textContent="Partager le puzzle"; btn.disabled=false;
-    const st=document.getElementById("createStatus");
-    st.classList.remove("hide"); st.className="status miss";
-    st.innerHTML="<span>Échec de l'envoi</span><span class='meta'>vérifie ta connexion / config Supabase</span>";
-  }
-}
-document.getElementById("btnShare").onclick=sharePuzzle;
-document.getElementById("btnCopyLink").onclick=async()=>{
-  const inp=document.getElementById("shareLink");
-  inp.select(); inp.setSelectionRange(0,99999);
-  try{await navigator.clipboard.writeText(inp.value);}catch(e){document.execCommand("copy");}
-  const b=document.getElementById("btnCopyLink"); const prev=b.textContent;
-  b.textContent="Copié !"; setTimeout(()=>b.textContent=prev,1500);
-};
-
-function hydratePuzzle(data){
-  return new Promise((resolve,reject)=>{
-    workH=data.work_h; aspectSet=true;
-    document.querySelectorAll(".frame").forEach(f=>f.style.aspectRatio=WORK_W+"/"+workH);
-    let toLoad=2;
-    const done=()=>{ if(--toLoad===0){
-      puzzle={cx:data.cx,cy:data.cy,r:data.r,maskData:data.mask};
-      resolve();
-    }};
-    const imA=new Image();
-    imA.onload=()=>{const c=document.createElement("canvas");c.width=WORK_W;c.height=workH;
-      c.getContext("2d").drawImage(imA,0,0,WORK_W,workH);imgs.A=c;done();};
-    imA.onerror=reject; imA.src=data.img_a;
-    const imB=new Image();
-    imB.onload=()=>{const c=document.createElement("canvas");c.width=WORK_W;c.height=workH;
-      c.getContext("2d").drawImage(imB,0,0,WORK_W,workH);imgs.B=c;done();};
-    imB.onerror=reject; imB.src=data.img_b;
-  });
-}
-function loadSharedPuzzle(id){
-  document.getElementById("tabPlay").classList.add("on");
-  document.getElementById("tabCreate").classList.remove("on");
-  document.getElementById("play").classList.remove("hide");
-  document.getElementById("create").classList.add("hide");
-  const ps=document.getElementById("playStatus"), ph=document.getElementById("playPh");
-  ps.className="status"; ps.innerHTML="<span>Chargement du puzzle…</span>";
-  ph.style.display=""; ph.textContent="Chargement du puzzle…";
-  if(!supabase){
-    ps.className="status miss";
-    ps.innerHTML="<span>Supabase non configuré</span><span class='meta'>renseigne SUPABASE_URL/KEY</span>";
-    ph.textContent="Configuration manquante";
-    return;
-  }
-  supabase.rpc("get_puzzle",{pid:id}).then(({data,error})=>{
-    const row=data&&data[0];
-    if(error||!row){
-      ps.className="status miss";
-      ps.innerHTML="<span>Puzzle introuvable</span><span class='meta'>le lien est peut-être invalide</span>";
-      ph.textContent="Puzzle introuvable";
-      return;
-    }
-    hydratePuzzle(row).then(setupPlay).catch(()=>{
-      ps.className="status miss";
-      ps.innerHTML="<span>Erreur de chargement des images</span>";
-      ph.textContent="Erreur de chargement";
-    });
-  });
-}
-
-const sharedId=new URLSearchParams(location.search).get("id");
-if(sharedId){ loadSharedPuzzle(sharedId); } else { startCreator(); }
+startCreator();
 </script>
 </body>
 </html>
