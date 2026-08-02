@@ -509,13 +509,14 @@ function setupPlay(){
   document.getElementById("playTag").textContent="Original";document.getElementById("playTag").classList.remove("hide");
   document.getElementById("playSub").textContent="Observe bien l'original… il va disparaître.";
   ps.className="status";ps.innerHTML="<span>Mémorise…</span>";
-  showBar(MEMO_S,false);
-  cdTimer=setTimeout(()=>{hideBar();goBlack();},MEMO_S*1000);
+  // Lancer une seule barre continue sur toute la durée totale
+  const totalS=MEMO_S+BLACK_S+GAME_TIMEOUT_S;
+  showBar(totalS,false);
+  cdTimer=setTimeout(()=>{goBlack();},MEMO_S*1000);
 }
 function goBlack(){
   document.getElementById("blackout").classList.remove("hide");
-  showBar(BLACK_S,false);
-  blackTimer=setTimeout(()=>{hideBar();revealModified();},BLACK_S*1000);
+  blackTimer=setTimeout(()=>{revealModified();},BLACK_S*1000);
 }
 function revealModified(){
   const fr=document.getElementById("frPlay");
@@ -527,7 +528,6 @@ function revealModified(){
   startTime=performance.now();
   const ps=document.getElementById("playStatus");
   ps.className="status";ps.innerHTML="<span>Où est le changement ?</span><span class='meta' id='timer'>0.0 s</span>";
-  showBar(GAME_TIMEOUT_S,false);
   runTimer();
 }
 function runTimer(){
@@ -537,9 +537,9 @@ function runTimer(){
     const t=elapsed();
     const el=document.getElementById("timer");if(el)el.textContent=t.toFixed(1)+" s";
     if(t>=GAME_TIMEOUT_S){timeOut();return;}
-    const pct=Math.max(0,1-t/GAME_TIMEOUT_S);
+    // Passer la barre en rouge dans les 2 dernières secondes
     const fill=document.getElementById("progressFill");
-    if(fill){fill.style.transition="none";fill.style.width=(pct*100)+"%";fill.style.background=pct>0.4?"#fff":"#c0392b";}
+    if(fill&&t>GAME_TIMEOUT_S-2) fill.style.background="#c0392b";
     timerRAF=requestAnimationFrame(tick);
   };
   timerRAF=requestAnimationFrame(tick);
@@ -598,7 +598,7 @@ function drawMarker(frame,cx,cy,r,kind){
   const m=document.createElement("div");
   m.className="marker"+(kind?" "+kind:"");
   if(kind!=="miss"&&kind!=="miss-zone"){m.style.width=(r*2*sx)+"px";m.style.height=(r*2*sy)+"px";}
-  else if(kind==="miss"){m.style.width="32px";m.style.height="32px";}
+  else if(kind==="miss"){m.style.width="44px";m.style.height="44px";}
   m.style.left=(cx*sx)+"px";m.style.top=(cy*sy)+"px";
   frame.appendChild(m);
 }
