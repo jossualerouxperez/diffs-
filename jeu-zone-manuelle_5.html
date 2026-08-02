@@ -494,14 +494,14 @@ function showBar(durationS){
   const bar=document.getElementById("progressBar"),fill=document.getElementById("progressFill");
   bar.classList.remove("hide"); bar.className="progress-bar";
   fill.style.transition="none"; fill.style.width="100%"; fill.style.background="#fff";
-  fill.style.transformOrigin="left"; fill.style.transform="scaleX(0)";
+  fill.style.transformOrigin="left"; fill.style.transform="scaleX(1)";
   fill.getBoundingClientRect();
   barDuration=durationS*1000; barStart=performance.now();
   cancelAnimationFrame(barRAF);
   const tick=()=>{
     const pct=Math.max(0,1-(performance.now()-barStart)/barDuration);
-    fill.style.transform="scaleX("+(1-pct)+")";
-    fill.style.background=pct<0.2?"#c0392b":"#fff";
+    fill.style.transform="scaleX("+pct+")";
+    fill.style.background="#fff";
     if(pct>0) barRAF=requestAnimationFrame(tick);
   };
   barRAF=requestAnimationFrame(tick);
