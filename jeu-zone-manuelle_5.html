@@ -598,7 +598,7 @@ function drawMarker(frame,cx,cy,r,kind){
   const m=document.createElement("div");
   m.className="marker"+(kind?" "+kind:"");
   if(kind!=="miss"&&kind!=="miss-zone"){m.style.width=(r*2*sx)+"px";m.style.height=(r*2*sy)+"px";}
-  else if(kind==="miss"){m.style.width="20px";m.style.height="20px";}
+  else if(kind==="miss"){m.style.width="32px";m.style.height="32px";}
   m.style.left=(cx*sx)+"px";m.style.top=(cy*sy)+"px";
   frame.appendChild(m);
 }
