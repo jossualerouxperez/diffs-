@@ -49,9 +49,8 @@
   .marker.miss-zone{border-color:var(--red);background:rgba(192,57,43,0.10);border-style:dashed;}
   .draw-canvas{position:absolute;inset:0;width:100%;height:100%;z-index:5;cursor:crosshair;touch-action:none;}
   .overlay{position:absolute;inset:0;z-index:6;display:flex;align-items:center;justify-content:center;}
-  .progress-bar{position:absolute;top:0;left:0;right:0;height:8px;z-index:7;background:rgba(255,255,255,0.2);border-radius:0;}
-  .progress-bar .fill{height:100%;background:#fff;border-radius:0;transition:width linear;}
-  .progress-bar.black-phase .fill{background:#fff;}
+  .progress-bar{position:absolute;top:0;left:0;right:0;height:4px;z-index:7;background:rgba(255,255,255,0.2);border-radius:0;}
+  .progress-bar .fill{height:100%;background:#fff;border-radius:0;}
   .overlay.countdown{background:transparent;}
   .overlay.countdown span{display:none;}
   .overlay.black{background:#000;}
@@ -502,6 +501,7 @@ function showBar(durationS){
     const pct=Math.max(0,1-(performance.now()-barStart)/barDuration);
     fill.style.transform="scaleX("+pct+")";
     fill.style.background="#fff";
+    fill.style.transformOrigin="left";
     if(pct>0) barRAF=requestAnimationFrame(tick);
   };
   barRAF=requestAnimationFrame(tick);
