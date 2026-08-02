@@ -578,8 +578,6 @@ function handleGuess(e){
   }else{
     totalPenalty+=PENALTY_MS;
     drawMarker(fr,p.cx,p.cy,12,"miss");
-    ps.className="status miss";ps.innerHTML="<span>Raté, réessaie</span><span class='meta'>—</span>";
-    setTimeout(()=>{if(solved)return;ps.className="status";ps.innerHTML="<span>Où est le changement ?</span><span class='meta' id='timer'>"+elapsed().toFixed(1)+" s</span>";},900);
   }
 }
 document.getElementById("frPlay").addEventListener("click",handleGuess);
@@ -600,7 +598,7 @@ function eventToWork(e,frame){
   return{cx:(e.clientX-r.left)/r.width*WORK_W,cy:(e.clientY-r.top)/r.height*workH};
 }
 function drawMarker(frame,cx,cy,r,kind){
-  clearMarkers(frame,kind==="miss");
+  if(kind!=="miss") clearMarkers(frame,false);
   const rect=frame.getBoundingClientRect();
   const sx=rect.width/WORK_W,sy=rect.height/workH;
   const m=document.createElement("div");
