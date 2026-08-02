@@ -569,7 +569,7 @@ function handleGuess(e){
     ps.className="status win";ps.innerHTML="<span>Trouvé en "+t.toFixed(1)+" s</span><span class='meta'>+"+pts+" pts</span>";
   }else{
     totalPenalty+=PENALTY_MS;
-    drawMarker(fr,p.cx,p.cy,puzzle.r,"miss");
+    drawMarker(fr,p.cx,p.cy,12,"miss");
     ps.className="status miss";ps.innerHTML="<span>Raté, réessaie</span><span class='meta'>—</span>";
     setTimeout(()=>{if(solved)return;ps.className="status";ps.innerHTML="<span>Où est le changement ?</span><span class='meta' id='timer'>"+elapsed().toFixed(1)+" s</span>";},900);
   }
@@ -597,7 +597,8 @@ function drawMarker(frame,cx,cy,r,kind){
   const sx=rect.width/WORK_W,sy=rect.height/workH;
   const m=document.createElement("div");
   m.className="marker"+(kind?" "+kind:"");
-  if(kind!=="miss-zone"){m.style.width=(r*2*sx)+"px";m.style.height=(r*2*sy)+"px";}
+  if(kind!=="miss"&&kind!=="miss-zone"){m.style.width=(r*2*sx)+"px";m.style.height=(r*2*sy)+"px";}
+  else if(kind==="miss"){m.style.width="24px";m.style.height="24px";}
   m.style.left=(cx*sx)+"px";m.style.top=(cy*sy)+"px";
   frame.appendChild(m);
 }
